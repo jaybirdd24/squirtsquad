@@ -1,0 +1,94 @@
+#pragma once
+
+#include <Servo.h>
+#include "percepetion.h"
+
+class movement
+{
+    private:
+        Servo left_front_motor;
+        Servo left_rear_motor;
+        Servo right_rear_motor;
+        Servo right_front_motor;
+
+        percepetion *perception;
+
+        // Heading PID state
+        float heading;          // integrated heading (degrees)
+        float target_heading;
+        unsigned long last_update_us;
+
+        float Kp;
+        float Ki;
+        float Kd;
+        float integral;
+        float prev_error;
+        float filtered_derivative;
+
+        static const float MAX_INTEGRAL = 300.0f;
+
+        // Wall-following PID state (vy axis)
+        static constexpr float KP_VY = 7.5f;
+        static constexpr float KI_VY = 0.002f;
+        static constexpr float KD_VY = 1.4f;
+        static const float MAX_INTEGRAL_VY = 300.0f;
+
+        float integral_vy;
+        float prev_error_vy;
+        float filtered_derivative_vy;
+        unsigned long last_wall_us;
+
+        // Slew-rate limiting
+        float current_speeds[4];       // actual speeds being sent (LF, LR, RR, RF)
+        unsigned long last_slew_us;
+        static constexpr float MAX_ACCEL_RATE = 1500.0f; // speed units/sec — fast ramp-up past static friction
+        static constexpr float MAX_DECEL_RATE = 600.0f;  // speed units/sec — slow ramp-down to reduce drift
+
+        // Sets raw PWM microseconds on all 4 motors (1500 = stop)
+        // Applies slew-rate limiting to smooth speed transitions
+        void setMotorSpeeds(int lf, int lr, int rr, int rf);
+
+    public:
+        movement(percepetion *perception);
+        ~movement();
+
+        void enable();           // attach servos to pins
+        void disable();          // detach servos
+
+        // Integrates gyroZ into heading, returns wz PID correction value
+        float headingCorrection();
+
+        // Record target_heading and reset PID state; call when starting a new motion
+        void latchHeading();
+
+        // Returns vy correction to maintain setpoint_mm distance from wall
+        // followLeft=true uses IR long left sensor (for left wall), false uses IR med right
+        float wallFollowCorrection(float setpoint_mm, bool followLeft = false);
+
+        // Mecanum IK: vx=forward, vy=strafe(+left), wz=rotation correction
+        void drive(int vx, int vy, int wz);
+
+        // Convenience wrappers (heading-corrected only, no wall following)
+        // speed: 0–1000  (matches reference code speed_val range)
+        void MoveForward(int speed);
+        void MoveBackward(int speed);
+        void MoveLeft(int speed);
+        void MoveRight(int speed);
+        void Stop(bool immediate = false);
+
+        // Set the desired global heading (degrees); use before/after a turn
+        void setTargetHeading(float degrees);
+
+        // Read the current integrated heading
+        float getHeading() const { return heading; }
+
+        // In-place rotation (integrates gyroZ into heading so PID stays valid)
+        void RotateCW(int speed);
+        void RotateCCW(int speed);
+
+        // Zero heading, target, and all PID state; call before MoveForward after a rotation
+        void resetHeading();
+
+        // Reset wall-follow PID state; call before starting a new wall-follow run
+        void resetWallFollow();
+};
