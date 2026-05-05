@@ -82,6 +82,11 @@ class movement
         // Read the current integrated heading
         float getHeading() const { return heading; }
 
+        // Telemetry getters — expose PID internals for real-time tuning via comms
+        float getTargetHeading()     const { return target_heading; }
+        float getLastHeadingError()  const { return prev_error; }
+        float getLastWallError()     const { return prev_error_vy; }
+
         // In-place rotation (integrates gyroZ into heading so PID stays valid)
         void RotateCW(int speed);
         void RotateCCW(int speed);
