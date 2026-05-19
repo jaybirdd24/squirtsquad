@@ -1,4 +1,5 @@
 #include "movement.h"
+#include "config.h"
 #include <Arduino.h>
 
 // Pin assignments matching base code shield pinout
@@ -14,6 +15,34 @@ static const int PWM_NEUTRAL = 1500;
 static const float DEFAULT_KP = 40.0f;
 static const float DEFAULT_KI = 0.02f;
 static const float DEFAULT_KD = 5.0f;
+
+namespace {
+float batteryCompensationScale(percepetion *perception)
+{
+    if (!Config::BATTERY_COMPENSATION_ENABLED || perception == nullptr) {
+        return 1.0f;
+    }
+
+    float voltage = perception->getBatteryVoltage();
+    if (voltage <= 0.0f) {
+        return 1.0f;
+    }
+
+    float compensatedVoltage = constrain(voltage,
+                                         Config::BATTERY_MIN_COMPENSATED_V,
+                                         Config::BATTERY_REFERENCE_V);
+    float scale = Config::BATTERY_REFERENCE_V / compensatedVoltage;
+    return constrain(scale, 1.0f, Config::BATTERY_MAX_SCALE);
+}
+
+int batteryCompensatedCommand(int command, float scale)
+{
+    if (command == 0) {
+        return 0;
+    }
+    return (int)constrain((float)command * scale, -1000.0f, 1000.0f);
+}
+}
 
 movement::movement(percepetion *perception)
     : perception(perception),
@@ -68,7 +97,13 @@ void movement::setMotorSpeeds(int lf, int lr, int rr, int rf)
     float accel_delta = MAX_ACCEL_RATE * dt;
     float decel_delta = MAX_DECEL_RATE * dt;
 
-    float target[4] = {(float)lf, (float)lr, (float)rr, (float)rf};
+    float batteryScale = batteryCompensationScale(perception);
+    float target[4] = {
+        (float)batteryCompensatedCommand(lf, batteryScale),
+        (float)batteryCompensatedCommand(lr, batteryScale),
+        (float)batteryCompensatedCommand(rr, batteryScale),
+        (float)batteryCompensatedCommand(rf, batteryScale)
+    };
     for (int i = 0; i < 4; i++) {
         float diff = target[i] - current_speeds[i];
         // Accelerating = moving away from zero, decelerating = moving toward zero

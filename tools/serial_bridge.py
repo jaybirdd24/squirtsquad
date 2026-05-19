@@ -2,7 +2,7 @@
 """
 serial_bridge.py — Real-time robot telemetry bridge
 
-Reads $S and $C CSV lines from the HC-12 wireless serial receiver (YP-05 USB adapter)
+Reads $S, $C, and $A CSV lines from the HC-12 wireless serial receiver (YP-05 USB adapter)
 and forwards each field as a UDP datagram to Teleplot (VS Code extension, port 47269).
 Also logs every raw line to a timestamped CSV file for post-run analysis.
 
@@ -41,6 +41,12 @@ CONTROL_FIELDS = ["hdg_sp", "hdg_actual", "hdg_err",
                   "wf_sp", "wf_actual", "wf_err",
                   "vx", "vy", "wz", "state"]
 
+# Avoidance isolation line:
+# $A,frontA,frontB,left,right,sonar,heading,targetHeading,headingError,state,phase,blocked,direction
+AVOID_FIELDS = ["front_a_mm", "front_b_mm", "left_mm", "right_mm",
+                "sonar_cm", "heading", "target_heading", "heading_err",
+                "state", "avoid_phase", "obstacle_blocked", "avoid_direction"]
+
 
 def list_ports():
     ports = list(serial.tools.list_ports.comports())
@@ -75,7 +81,7 @@ def open_log_file():
     filename = f"telemetry_log_{ts}.csv"
     f = open(filename, "w", newline="")
     writer = csv.writer(f)
-    writer.writerow(["wall_time"] + SENSOR_FIELDS + CONTROL_FIELDS)
+    writer.writerow(["wall_time"] + SENSOR_FIELDS + CONTROL_FIELDS + AVOID_FIELDS)
     print(f"Logging to {filename}")
     return f, writer
 
@@ -94,7 +100,7 @@ def main():
     log_file, log_writer = open_log_file()
 
     # Live terminal summary state
-    summary = {k: "—" for k in SENSOR_FIELDS + CONTROL_FIELDS}
+    summary = {k: "—" for k in SENSOR_FIELDS + CONTROL_FIELDS + AVOID_FIELDS}
     last_summary_time = time.time()
     line_count = 0
 
@@ -132,11 +138,16 @@ def main():
                     parts = line.split(",")[1:]
                     for k, v in zip(CONTROL_FIELDS, parts):
                         summary[k] = v
+                elif line.startswith("$A,"):
+                    parse_and_forward(line, sock, AVOID_FIELDS)
+                    parts = line.split(",")[1:]
+                    for k, v in zip(AVOID_FIELDS, parts):
+                        summary[k] = v
 
                 # Log every raw line with wall clock
                 log_writer.writerow(
                     [datetime.datetime.now().isoformat()] +
-                    [summary.get(k, "") for k in SENSOR_FIELDS + CONTROL_FIELDS]
+                    [summary.get(k, "") for k in SENSOR_FIELDS + CONTROL_FIELDS + AVOID_FIELDS]
                 )
                 log_file.flush()
 
@@ -144,14 +155,26 @@ def main():
             now = time.time()
             if now - last_summary_time >= 1.0:
                 last_summary_time = now
-                ir = (f"ir F:{summary['ir_f_mm']:>6} "
-                      f"L:{summary['ir_l_mm']:>6} "
-                      f"R:{summary['ir_r_mm']:>6} "
-                      f"RR:{summary['ir_rr_mm']:>6} mm")
-                ctrl = (f"hdg err:{summary['hdg_err']:>7}° "
-                        f"wf err:{summary['wf_err']:>7} mm "
-                        f"batt:{summary['batt_v']:>4} V "
-                        f"state:{summary['state']}")
+                if summary["front_a_mm"] != "—":
+                    ir = (f"front A:{summary['front_a_mm']:>6} "
+                          f"B:{summary['front_b_mm']:>6} "
+                          f"L:{summary['left_mm']:>6} "
+                          f"R:{summary['right_mm']:>6} mm "
+                          f"sonar:{summary['sonar_cm']:>6} cm")
+                    ctrl = (f"hdg err:{summary['heading_err']:>7} "
+                            f"state:{summary['state']} "
+                            f"phase:{summary['avoid_phase']} "
+                            f"blocked:{summary['obstacle_blocked']} "
+                            f"dir:{summary['avoid_direction']}")
+                else:
+                    ir = (f"ir F:{summary['ir_f_mm']:>6} "
+                          f"L:{summary['ir_l_mm']:>6} "
+                          f"R:{summary['ir_r_mm']:>6} "
+                          f"RR:{summary['ir_rr_mm']:>6} mm")
+                    ctrl = (f"hdg err:{summary['hdg_err']:>7} "
+                            f"wf err:{summary['wf_err']:>7} mm "
+                            f"batt:{summary['batt_v']:>4} V "
+                            f"state:{summary['state']}")
                 print(f"\r{ir}  |  {ctrl}  [{line_count} lines]", end="", flush=True)
 
     except KeyboardInterrupt:

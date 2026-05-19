@@ -25,13 +25,13 @@ class movement
         float prev_error;
         float filtered_derivative;
 
-        static const float MAX_INTEGRAL = 300.0f;
+        static constexpr float MAX_INTEGRAL = 300.0f;
 
         // Wall-following PID state (vy axis)
         static constexpr float KP_VY = 7.5f;
         static constexpr float KI_VY = 0.002f;
         static constexpr float KD_VY = 1.4f;
-        static const float MAX_INTEGRAL_VY = 300.0f;
+        static constexpr float MAX_INTEGRAL_VY = 300.0f;
 
         float integral_vy;
         float prev_error_vy;

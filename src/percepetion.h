@@ -8,7 +8,7 @@
 constexpr uint8_t PIN_IR_MED_FRONT   = A10;  // 2D120X / 2Y0A41SK, 40-300 mm — front medium range
 constexpr uint8_t PIN_IR_LONG_LEFT   = A8;   // 2Y0A21, 100-800 mm — left sensor
 constexpr uint8_t PIN_IR_MED_RIGHT   = A12;  // 2D120X / 2Y0A41SK, 40-300 mm — right sensor
-constexpr uint8_t PIN_IR_LONG_REAR   = A9;   // 2Y0A21, 100-800 mm — rear long range
+constexpr uint8_t PIN_IR_LONG_REAR   = A9;   // 2Y0A21, 100-800 mm — now mounted as second front IR
 
 // Ultrasonic HC-SR04
 constexpr uint8_t PIN_US_TRIG = 48;
@@ -76,7 +76,7 @@ public:
     float getIRMedFront();    // front-facing medium-range
     float getIRLongLeft();    // left-facing  long-range
     float getIRMedRight();    // right-facing medium-range
-    float getIRLongRear();    // rear-facing  long-range
+    float getIRLongRear();    // second front-facing long-range IR (keeps original API name)
 
     // Raw ADC values (useful for calibration / serial logging)
     int   getIRMedFrontRaw();

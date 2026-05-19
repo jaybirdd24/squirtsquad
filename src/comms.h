@@ -23,4 +23,10 @@ class comms
         void sendControlData(float hdgSp, float hdgActual, float hdgErr,
                              float wfSp, float wfActual, float wfErr,
                              int vx, int vy, int wz, int state);
+
+        // Stream obstacle-avoidance isolation telemetry
+        void sendAvoidanceData(float frontA, float frontB, float left, float right,
+                               float sonar, float heading, float targetHeading,
+                               float headingError, int state, int phase,
+                               int obstacleBlocked, int avoidDirection);
 };

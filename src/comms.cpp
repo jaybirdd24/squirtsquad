@@ -50,3 +50,41 @@ void comms::sendControlData(float hdgSp, float hdgActual, float hdgErr,
     _hc12.print(wz);           _hc12.print(',');
     _hc12.println(state);
 }
+
+void comms::sendAvoidanceData(float frontA, float frontB, float left, float right,
+                              float sonar, float heading, float targetHeading,
+                              float headingError, int state, int phase,
+                              int obstacleBlocked, int avoidDirection)
+{
+    unsigned long now = millis();
+    if (now - _last_send_ms < SEND_INTERVAL_MS) return;
+    _last_send_ms = now;
+
+    _hc12.print(F("$A,"));
+    _hc12.print(frontA, 1);        _hc12.print(',');
+    _hc12.print(frontB, 1);        _hc12.print(',');
+    _hc12.print(left, 1);          _hc12.print(',');
+    _hc12.print(right, 1);         _hc12.print(',');
+    _hc12.print(sonar, 1);         _hc12.print(',');
+    _hc12.print(heading, 2);       _hc12.print(',');
+    _hc12.print(targetHeading, 2); _hc12.print(',');
+    _hc12.print(headingError, 2);  _hc12.print(',');
+    _hc12.print(state);            _hc12.print(',');
+    _hc12.print(phase);            _hc12.print(',');
+    _hc12.print(obstacleBlocked);  _hc12.print(',');
+    _hc12.println(avoidDirection);
+
+    // Direct Teleplot serial format for the HC-12 receiver stream.
+    _hc12.print(F(">front_a_mm:"));       _hc12.println(frontA, 1);
+    _hc12.print(F(">front_b_mm:"));       _hc12.println(frontB, 1);
+    _hc12.print(F(">left_mm:"));          _hc12.println(left, 1);
+    _hc12.print(F(">right_mm:"));         _hc12.println(right, 1);
+    _hc12.print(F(">sonar_cm:"));         _hc12.println(sonar, 1);
+    _hc12.print(F(">heading:"));          _hc12.println(heading, 2);
+    _hc12.print(F(">target_heading:"));   _hc12.println(targetHeading, 2);
+    _hc12.print(F(">heading_err:"));      _hc12.println(headingError, 2);
+    _hc12.print(F(">state:"));            _hc12.println(state);
+    _hc12.print(F(">avoid_phase:"));      _hc12.println(phase);
+    _hc12.print(F(">obstacle_blocked:")); _hc12.println(obstacleBlocked);
+    _hc12.print(F(">avoid_direction:"));  _hc12.println(avoidDirection);
+}

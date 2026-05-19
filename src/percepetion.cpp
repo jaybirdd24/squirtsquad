@@ -160,7 +160,7 @@ float percepetion::irMedRightRawToMm(int raw) const
 
 float percepetion::irLongRearRawToMm(int raw) const
 {
-    // Sharp 2Y0A21 on A9 (rear-facing, 100-800 mm range)
+    // Sharp 2Y0A21 on A9 (now front-facing, 100-800 mm range)
     // good but breaks at 65 cm ID: 06
     if (raw < 20) return 800.0f;
     float mm = 128820.0f * pow((float)raw, -1.161f);
