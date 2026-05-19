@@ -33,7 +33,7 @@
 // #define PT_PIN  A13
 // #define PT_PIN  A14
 // #define PT_PIN  A15
-#define PT_PIN  A1   // <-- change this to whichever pin you are testing
+#define PT_PIN  A4   // <-- change this to whichever pin you are testing
 
 // ── 2. Select the wiring configuration (uncomment ONE) ───────────────────────
 //
