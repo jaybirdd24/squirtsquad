@@ -15,11 +15,18 @@ constexpr uint8_t PIN_US_TRIG = 48;
 constexpr uint8_t PIN_US_ECHO = 49;
 constexpr unsigned long US_MAX_PULSE_US = 23200;  // ~400 cm timeout
 
+// Phototransistors — analog pins (front of robot)
+constexpr uint8_t PIN_PT_CLOSE_RIGHT = A4;
+constexpr uint8_t PIN_PT_LONG_RIGHT  = A5;
+constexpr uint8_t PIN_PT_LONG_LEFT   = A6;
+constexpr uint8_t PIN_PT_CLOSE_LEFT  = A7;
+
 // Battery voltage divider
 constexpr uint8_t PIN_BATTERY = A0;
 
 // ── Smoothing ──────────────────────────────────────────────────────
 constexpr float IR_EMA_ALPHA = 0.1f;  // EMA low-pass filter coefficient (0-1, lower = smoother)
+constexpr float PT_EMA_ALPHA = 0.15f; // EMA for phototransistors
 constexpr float US_EMA_ALPHA = 0.2f;  // EMA for ultrasonic (lower = smoother)
 constexpr float US_MAX_JUMP_CM = 5.0f; // reject readings that jump more than this from previous
 
@@ -36,6 +43,12 @@ private:
     float irMedRightFiltered;
     float irLongRearFiltered;
 
+    // ── Phototransistor EMA state ─────────────────────────────────
+    float ptCloseRightFiltered;
+    float ptLongRightFiltered;
+    float ptLongLeftFiltered;
+    float ptCloseLefFiltered;
+
     // ── Ultrasonic ────────────────────────────────────────────────
     float usDistanceCm;
     float usLastValidCm;    // last accepted reading (for spike rejection)
@@ -44,6 +57,7 @@ private:
     // ── Helpers ───────────────────────────────────────────────────
     void  readIR();
     void  readUltrasonic();
+    void  readPhototransistors();
 
     // Convert raw ADC (0-1023) to distance in mm.
     // NOTE: these are starting-point approximations — calibrate with
@@ -97,5 +111,12 @@ public:
 
     // Returns true if any sensor reads below threshold_mm
     bool isObstacleTooClose(float threshold_mm);
+
+    // ── Phototransistor getters (raw ADC 0-1023, EMA filtered) ───
+    // Higher value = more light
+    int getPTCloseRight();
+    int getPTLongRight();
+    int getPTLongLeft();
+    int getPTCloseLeft();
 
 };

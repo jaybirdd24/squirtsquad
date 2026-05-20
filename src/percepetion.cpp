@@ -14,6 +14,10 @@ percepetion::percepetion()
       usDistanceCm(0.0f),
       usLastValidCm(-1.0f),
       usRejectCount(0),
+      ptCloseRightFiltered(0.0f),
+      ptLongRightFiltered(0.0f),
+      ptLongLeftFiltered(0.0f),
+      ptCloseLefFiltered(0.0f),
       gyro_bias(0.0f),
       gyro_bias_sum(0.0),
       gyro_bias_count(0),
@@ -47,11 +51,22 @@ bool percepetion::init()
     if (!bno08x.enableReport(SH2_GYROSCOPE_UNCALIBRATED, 10000))
         return false;
 
+    // ── Phototransistors ──────────────────────────────────────────
+    pinMode(PIN_PT_CLOSE_RIGHT, INPUT);
+    pinMode(PIN_PT_LONG_RIGHT,  INPUT);
+    pinMode(PIN_PT_LONG_LEFT,   INPUT);
+    pinMode(PIN_PT_CLOSE_LEFT,  INPUT);
+
     // Seed EMA filters with first reading so they start at a real value
     irMedFrontFiltered = (float)analogRead(PIN_IR_MED_FRONT);
     irLongLeftFiltered = (float)analogRead(PIN_IR_LONG_LEFT);
     irMedRightFiltered = (float)analogRead(PIN_IR_MED_RIGHT);
     irLongRearFiltered = (float)analogRead(PIN_IR_LONG_REAR);
+
+    ptCloseRightFiltered = (float)analogRead(PIN_PT_CLOSE_RIGHT);
+    ptLongRightFiltered  = (float)analogRead(PIN_PT_LONG_RIGHT);
+    ptLongLeftFiltered   = (float)analogRead(PIN_PT_LONG_LEFT);
+    ptCloseLefFiltered   = (float)analogRead(PIN_PT_CLOSE_LEFT);
 
     return true;
 }
@@ -73,6 +88,9 @@ void percepetion::update()
 
     // Ultrasonic
     readUltrasonic();
+
+    // Phototransistors
+    readPhototransistors();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -264,6 +282,23 @@ bool percepetion::isObstacleTooClose(float threshold_mm)
            getIRMedRight()  < threshold_mm ||
            getIRLongRear()  < threshold_mm;
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  Phototransistors
+// ═══════════════════════════════════════════════════════════════════
+
+void percepetion::readPhototransistors()
+{
+    ptCloseRightFiltered += PT_EMA_ALPHA * ((float)analogRead(PIN_PT_CLOSE_RIGHT) - ptCloseRightFiltered);
+    ptLongRightFiltered  += PT_EMA_ALPHA * ((float)analogRead(PIN_PT_LONG_RIGHT)  - ptLongRightFiltered);
+    ptLongLeftFiltered   += PT_EMA_ALPHA * ((float)analogRead(PIN_PT_LONG_LEFT)   - ptLongLeftFiltered);
+    ptCloseLefFiltered   += PT_EMA_ALPHA * ((float)analogRead(PIN_PT_CLOSE_LEFT)  - ptCloseLefFiltered);
+}
+
+int percepetion::getPTCloseRight() { return (int)ptCloseRightFiltered; }
+int percepetion::getPTLongRight()  { return (int)ptLongRightFiltered;  }
+int percepetion::getPTLongLeft()   { return (int)ptLongLeftFiltered;   }
+int percepetion::getPTCloseLeft()  { return (int)ptCloseLefFiltered;   }
 
 void percepetion::feedGyroBias() {
     if (gyro_bias_frozen) return;
