@@ -17,7 +17,9 @@ static const float CLUSTER_GAP_DEG   = 30.0f;   // gap > this = new cluster
 static const float HEADING_TOLERANCE  = 3.0f;    // deg, close enough when rotating
 static const float STOP_DISTANCE_CM   = 15.0f;   // ultrasonic stop threshold (tune this)
 static const int   APPROACH_SPEED     = 150;      // forward drive speed
-static const int   STEER_GAIN         = 50;       // volts diff → drive correction units
+static const float STEER_KP           = 50.0f;   // proportional gain (tune this)
+static const float STEER_KI           = 5.0f;    // integral gain (tune this)
+static const float STEER_I_MAX        = 1.0f;    // anti-windup clamp (volts·s)
 static const int   MAX_STEER          = 100;      // max steering correction
 static const float ALIGN_TOLERANCE_V  = 0.05f;   // close range balance tolerance
 static const int   ALIGN_SPEED        = 40;       // fine alignment rotation speed
@@ -38,6 +40,8 @@ static int           sampleCount      = 0;
 static unsigned long lastLog          = 0;
 static float         targetHeading    = 0.0f;
 static unsigned long coarseAlignStart = 0;
+static float         steerIntegral    = 0.0f;
+static unsigned long lastSteerTime    = 0;
 
 static const unsigned long COARSE_ALIGN_TIMEOUT_MS = 4000;
 
@@ -162,7 +166,9 @@ static void runCoarseAlign()
         motors.Stop(true);
         if (timedOut) Serial.println(F("# Coarse align timeout — approach steering will correct"));
         else          Serial.println(F("# Coarse aligned. Approaching..."));
-        lastLog = 0;
+        lastLog       = 0;
+        steerIntegral = 0.0f;
+        lastSteerTime = 0;
         state = APPROACH;
         return;
     }
@@ -187,26 +193,33 @@ static void runApproach()
         return;
     }
 
-    // A5 = long range right, A6 = long range left
-    // diff < 0 → A5 lower → more light on right → steer right (negative wz = CW)
+    // PI steering: error = rightV - leftV (A5 - A6)
+    // positive error → right voltage higher → turn right (positive wz in drive = CCW, so negate)
     float vA5  = adcToVolts(analogRead(A5));
     float vA6  = adcToVolts(analogRead(A6));
-    float diff = vA5 - vA6;
-    int   corr = constrain((int)(diff * STEER_GAIN), -MAX_STEER, MAX_STEER);
-
-    motors.drive(APPROACH_SPEED, 0, -corr);  // negative: diff<0 → steer right (CW = negative wz)
+    float error = -vA5 +vA6;
 
     unsigned long now = millis();
+    float dt = (lastSteerTime == 0) ? 0.05f : (now - lastSteerTime) / 1000.0f;
+    lastSteerTime = now;
+
+    steerIntegral = constrain(steerIntegral + error * dt, -STEER_I_MAX, STEER_I_MAX);
+
+    float piOut = STEER_KP * error + STEER_KI * steerIntegral;
+    int   wz    = constrain((int)piOut, -MAX_STEER, MAX_STEER);
+
+    motors.drive(APPROACH_SPEED, 0, wz);
+
     if (now - lastLog >= LOG_INTERVAL_MS) {
         lastLog = now;
-        Serial.print(F("# approach dist="));
+        Serial.print(F("# dist="));
         Serial.print(dist, 1);
-        Serial.print(F(" A5="));
-        Serial.print(vA5, 3);
-        Serial.print(F(" A6="));
-        Serial.print(vA6, 3);
-        Serial.print(F(" corr="));
-        Serial.println(corr);
+        Serial.print(F(" err="));
+        Serial.print(error, 3);
+        Serial.print(F(" I="));
+        Serial.print(steerIntegral, 3);
+        Serial.print(F(" wz="));
+        Serial.println(wz);
     }
 }
 
