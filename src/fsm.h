@@ -16,6 +16,14 @@ public:
     void fsmUpdate();
 
 private:
+    static const int MAX_LIGHT_SAMPLES = 150;
+
+    struct LightSample {
+        float    heading;
+        uint16_t longRightRaw;
+        uint16_t longLeftRaw;
+    };
+
     // ── Subsystem instances ───────────────────────────────────────────
     percepetion perception;
     movement    motors;
@@ -23,9 +31,13 @@ private:
 
     // ── State machine ─────────────────────────────────────────────────
     enum class State {
-        INITIALISING,   // accumulating gyro bias before movement
-        DRIVE_FORWARD,  // isolation test: drive straight along the latched path
-        AVOID_OBSTACLE  // move around a forward obstacle, then return to path
+        INITIALISING,    // accumulating gyro bias before movement
+        SCANNING,        // rotate 360 deg and record long-range light readings
+        ANALYZING,       // choose the target heading from the scan
+        COARSE_ALIGN,    // rotate toward the target heading
+        APPROACH_LIGHT,  // fuzzy fire homing + obstacle avoidance
+        FINE_ALIGN,      // close-range light alignment before stopping
+        ALIGNED          // target reached/aligned
     };
     State state;
 
@@ -37,13 +49,27 @@ private:
     float distSonar;    // centre ultrasonic forward distance (cm)
 
     // ── Path data ─────────────────────────────────────────────────────
-    float pathHeading; // heading to hold before/during/after avoidance
+    float targetHeading;
+
+    // ── Light homing data ─────────────────────────────────────────────
+    LightSample   lightSamples[MAX_LIGHT_SAMPLES];
+    int           lightSampleCount;
+    unsigned long lastLightLogMs;
+    unsigned long coarseAlignStartMs;
+    unsigned long fineAlignStartMs;
+    uint16_t      lightCloseRightRaw;
+    uint16_t      lightLongRightRaw;
+    uint16_t      lightLongLeftRaw;
+    uint16_t      lightCloseLeftRaw;
+    int           lastVx;
+    int           lastVy;
+    int           lastWz;
+    float         lastFireOffset;
+    float         lastObstacleCm;
+    float         lastSidePreference;
 
     // ── Avoid-obstacle data ───────────────────────────────────────────
     int           avoidDirection; // +1 = left first, -1 = right first
-    unsigned int  obstacleConfirmTicks;
-    unsigned int  obstacleClearTicks;
-    unsigned long lastAvoidExitMs;
 
     // ── Startup data ──────────────────────────────────────────────────
     unsigned long lastGyroBiasMs;
@@ -56,15 +82,25 @@ private:
     void cacheSensors();
 
     // ── State handlers (dispatched from fsmUpdate switch) ────────────
-    void initialising();   // accumulate gyro bias; -> DRIVE_FORWARD when ready
-    void driveForward();   // drive on pathHeading; obstacles -> AVOID_OBSTACLE
-    void avoidObstacle();  // strafe until the forward sensors are clear
+    void initialising();
+    void scanForLight();
+    void analyzeLightScan();
+    void coarseAlignToLight();
+    void approachLight();
+    void fineAlignToLight();
+
+    // ── Light helpers ─────────────────────────────────────────────────
+    void  resetLightScan();
+    float analyzeScans();
+    float nearestForwardObstacleCm() const;
+    float sideClearancePreference() const;
+    int   selectAvoidDirectionForApproach(float obstacleCm);
+    void  fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference,
+                        int avoidDirection, int &vx, int &vy, int &wz) const;
 
     // ── Avoidance helpers ─────────────────────────────────────────────
     bool forwardObstacleDetected() const;
-    bool forwardPathClear() const;
     bool sideClearForDirection(int direction) const;
     int  chooseAvoidDirection() const;
-    void beginAvoidance();
     void sendTelemetry();
 };
