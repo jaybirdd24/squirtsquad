@@ -88,3 +88,19 @@ void comms::sendAvoidanceData(float frontA, float frontB, float left, float righ
     _hc12.print(F(">obstacle_blocked:")); _hc12.println(obstacleBlocked);
     _hc12.print(F(">avoid_direction:"));  _hc12.println(avoidDirection);
 }
+
+void comms::sendLightData(float heading, float a4, float a5, float a6, float a7)
+{
+    _hc12.print(F("$L,"));
+    _hc12.print(heading, 1); _hc12.print(',');
+    _hc12.print(a4, 3);      _hc12.print(',');
+    _hc12.print(a5, 3);      _hc12.print(',');
+    _hc12.print(a6, 3);      _hc12.print(',');
+    _hc12.println(a7, 3);
+
+    _hc12.print(F(">heading:"));  _hc12.println(heading, 1);
+    _hc12.print(F(">pt_a4_v:"));  _hc12.println(a4, 3);
+    _hc12.print(F(">pt_a5_v:"));  _hc12.println(a5, 3);
+    _hc12.print(F(">pt_a6_v:"));  _hc12.println(a6, 3);
+    _hc12.print(F(">pt_a7_v:"));  _hc12.println(a7, 3);
+}

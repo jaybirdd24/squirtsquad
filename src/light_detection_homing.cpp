@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "percepetion.h"
 #include "movement.h"
+#include "comms.h"
 
 // A4 = close range right of fan   A5 = long range right of fan
 // A6 = long range left of fan     A7 = close range left of fan
@@ -12,17 +13,17 @@ static const int           GYRO_INTERVAL_MS   = 10;
 static const float         SCAN_TARGET_DEG    = 360.0f;
 static const unsigned long LOG_INTERVAL_MS    = 50;
 
-static const float DETECT_THRESHOLD_V = 4.0f;   // long range dip = light detected
+static const float DETECT_THRESHOLD_V = 4.5f;   // long range dip = light detected
 static const float CLUSTER_GAP_DEG   = 30.0f;   // gap > this = new cluster
 static const float HEADING_TOLERANCE  = 3.0f;    // deg, close enough when rotating
-static const float STOP_DISTANCE_CM   = 15.0f;   // ultrasonic stop threshold (tune this)
+static const float STOP_VOLTAGE_V     = 1.0f;    // close range sensor threshold to stop approach
 static const int   APPROACH_SPEED     = 150;      // forward drive speed
-static const float STEER_KP           = 50.0f;   // proportional gain (tune this)
+static const float STEER_KP           = 200.0f;   // proportional gain (tune this)
 static const float STEER_KI           = 5.0f;    // integral gain (tune this)
 static const float STEER_I_MAX        = 1.0f;    // anti-windup clamp (volts·s)
-static const int   MAX_STEER          = 100;      // max steering correction
-static const float ALIGN_TOLERANCE_V  = 0.05f;   // close range balance tolerance
-static const int   ALIGN_SPEED        = 40;       // fine alignment rotation speed
+static const int   MAX_STEER          = 200;      // max steering correction
+static const float ALIGN_TOLERANCE_V  = 0.25f;   // close range balance tolerance (tune — sensors have ~0.196V natural offset)
+static const int   ALIGN_SPEED        = 100;      // fine alignment rotation speed
 // ─────────────────────────────────────────────────────────────────────────────
 
 static const int MAX_SAMPLES = 150;
@@ -34,12 +35,14 @@ struct Sample {
 
 static percepetion perception;
 static movement    motors(&perception);
+static comms       _comms;
 
 static Sample        samples[MAX_SAMPLES];
 static int           sampleCount      = 0;
 static unsigned long lastLog          = 0;
 static float         targetHeading    = 0.0f;
 static unsigned long coarseAlignStart = 0;
+static unsigned long fineAlignStart   = 0;
 static float         steerIntegral    = 0.0f;
 static unsigned long lastSteerTime    = 0;
 
@@ -87,64 +90,40 @@ static void runScan()
 // ── Cluster analysis on long range sensors → coarse heading ───────────────────
 static float analyzeScans()
 {
-    struct Cluster { float minVoltage; float bestHeading; };
-
-    static const int MAX_CLUSTERS = 2;
-    Cluster clusters[MAX_CLUSTERS];
-    int clusterCount = 0;
-
-    bool  inDip        = false;
-    float clusterMinV  = 5.0f;
-    float clusterBestH = 0.0f;
-    float lastDipHdg   = -999.0f;
+    // Find the heading of the lowest-voltage sample for each long-range sensor.
+    // Using the voltage minimum rather than dip-window midpoints avoids the
+    // failure mode where a loose threshold keeps the dip "open" for most of the
+    // scan, making the midpoint land far from the actual light peak.
+    float minV5 = 5.0f, bestH5 = -1.0f;
+    float minV6 = 5.0f, bestH6 = -1.0f;
 
     for (int i = 0; i < sampleCount; i++) {
-        float minV    = adcToVolts(min(samples[i].a5, samples[i].a6));
-        bool  detected = (minV < DETECT_THRESHOLD_V);
+        float v5 = adcToVolts(samples[i].a5);
+        float v6 = adcToVolts(samples[i].a6);
 
-        if (detected) {
-            bool newCluster = !inDip || (samples[i].heading - lastDipHdg > CLUSTER_GAP_DEG);
-            if (newCluster) {
-                if (inDip && clusterCount < MAX_CLUSTERS) {
-                    clusters[clusterCount++] = { clusterMinV, clusterBestH };
-                }
-                clusterMinV  = minV;
-                clusterBestH = samples[i].heading;
-                inDip        = true;
-            }
-            if (minV < clusterMinV) {
-                clusterMinV  = minV;
-                clusterBestH = samples[i].heading;
-            }
-            lastDipHdg = samples[i].heading;
-        } else if (inDip) {
-            if (clusterCount < MAX_CLUSTERS) {
-                clusters[clusterCount++] = { clusterMinV, clusterBestH };
-            }
-            inDip = false;
-        }
-    }
-    if (inDip && clusterCount < MAX_CLUSTERS) {
-        clusters[clusterCount++] = { clusterMinV, clusterBestH };
+        if (v5 < DETECT_THRESHOLD_V && v5 < minV5) { minV5 = v5; bestH5 = samples[i].heading; }
+        if (v6 < DETECT_THRESHOLD_V && v6 < minV6) { minV6 = v6; bestH6 = samples[i].heading; }
     }
 
-    if (clusterCount == 0) {
+    bool found5 = (bestH5 >= 0.0f);
+    bool found6 = (bestH6 >= 0.0f);
+
+    if (!found5 && !found6) {
         Serial.println(F("# No light source detected."));
         return -1.0f;
     }
 
-    int best = 0;
-    for (int i = 1; i < clusterCount; i++) {
-        if (clusters[i].minVoltage < clusters[best].minVoltage) best = i;
-    }
+    float result;
+    if (found5 && found6) result = (bestH5 + bestH6) * 0.5f;
+    else if (found5)      result = bestH5;
+    else                  result = bestH6;
 
-    Serial.print(F("# Found "));
-    Serial.print(clusterCount);
-    Serial.print(F(" source(s). Closest at "));
-    Serial.print(clusters[best].bestHeading, 1);
-    Serial.println(F(" deg"));
+    Serial.print(F("# a5 peak: ")); Serial.print(bestH5, 1);
+    Serial.print(F("°  a6 peak: ")); Serial.print(bestH6, 1);
+    Serial.print(F("°  => target: ")); Serial.print(result, 1);
+    Serial.println(F("°"));
 
-    return clusters[best].bestHeading;
+    return result;
 }
 
 // ── Coarse align: rotate to scan heading, timeout if gyro drift prevents settle ─
@@ -183,12 +162,16 @@ static void runApproach()
 {
     perception.update();
 
-    float dist = perception.getUltrasonicCm();
-    if (dist > 0 && dist < STOP_DISTANCE_CM) {
+    float vA4close = adcToVolts(analogRead(A4));
+    float vA7close = adcToVolts(analogRead(A7));
+    if (vA4close <= STOP_VOLTAGE_V || vA7close <= STOP_VOLTAGE_V) {
         motors.Stop(true);
-        Serial.print(F("# Obstacle at "));
-        Serial.print(dist, 1);
-        Serial.println(F(" cm. Fine aligning..."));
+        Serial.print(F("# Close range triggered (A4="));
+        Serial.print(vA4close, 3);
+        Serial.print(F(" A7="));
+        Serial.print(vA7close, 3);
+        Serial.println(F("). Fine aligning..."));
+        fineAlignStart = 0;
         state = FINE_ALIGN;
         return;
     }
@@ -212,25 +195,30 @@ static void runApproach()
 
     if (now - lastLog >= LOG_INTERVAL_MS) {
         lastLog = now;
-        Serial.print(F("# dist="));
-        Serial.print(dist, 1);
+        Serial.print(F("# A4="));
+        Serial.print(vA4close, 3);
+        Serial.print(F(" A7="));
+        Serial.print(vA7close, 3);
         Serial.print(F(" err="));
         Serial.print(error, 3);
         Serial.print(F(" I="));
         Serial.print(steerIntegral, 3);
         Serial.print(F(" wz="));
         Serial.println(wz);
+
     }
 }
 
 // ── Fine align: nudge using close range A4/A7 differential ───────────────────
 static void runFineAlign()
 {
+    if (fineAlignStart == 0) fineAlignStart = millis();
+
     perception.update();
 
     float vA4 = adcToVolts(analogRead(A4));
     float vA7 = adcToVolts(analogRead(A7));
-    float diff = vA4 - vA7;  // negative = A4 lower = more light right = rotate CW
+    float diff = vA4 - vA7;
 
     Serial.print(F("# fine A4="));
     Serial.print(vA4, 3);
@@ -239,9 +227,12 @@ static void runFineAlign()
     Serial.print(F(" diff="));
     Serial.println(diff, 3);
 
-    if (abs(diff) <= ALIGN_TOLERANCE_V) {
+    bool balanced = abs(diff) <= ALIGN_TOLERANCE_V;
+    bool timedOut = (millis() - fineAlignStart) > 5000;
+
+    if (balanced || timedOut) {
         motors.Stop(true);
-        Serial.println(F("# ALIGNED"));
+        Serial.println(timedOut ? F("# Fine align timeout — declaring ALIGNED") : F("# ALIGNED"));
         state = ALIGNED;
         return;
     }
@@ -261,6 +252,7 @@ void setup()
     delay(1000);
 
     Serial.println(F("# Initialising..."));
+    _comms.init(9600);
     perception.init();
     motors.enable();
 

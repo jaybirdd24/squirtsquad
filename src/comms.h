@@ -29,4 +29,7 @@ class comms
                                float sonar, float heading, float targetHeading,
                                float headingError, int state, int phase,
                                int obstacleBlocked, int avoidDirection);
+
+        // Stream light-detection telemetry (all 4 phototransistors + heading)
+        void sendLightData(float heading, float a4, float a5, float a6, float a7);
 };
