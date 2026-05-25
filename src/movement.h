@@ -25,13 +25,13 @@ class movement
         float prev_error;
         float filtered_derivative;
 
-        static const float MAX_INTEGRAL = 300.0f;
+        static constexpr float MAX_INTEGRAL = 300.0f;
 
         // Wall-following PID state (vy axis)
         static constexpr float KP_VY = 7.5f;
         static constexpr float KI_VY = 0.002f;
         static constexpr float KD_VY = 1.4f;
-        static const float MAX_INTEGRAL_VY = 300.0f;
+        static constexpr float MAX_INTEGRAL_VY = 300.0f;
 
         float integral_vy;
         float prev_error_vy;
@@ -81,6 +81,11 @@ class movement
 
         // Read the current integrated heading
         float getHeading() const { return heading; }
+
+        // Telemetry getters — expose PID internals for real-time tuning via comms
+        float getTargetHeading()     const { return target_heading; }
+        float getLastHeadingError()  const { return prev_error; }
+        float getLastWallError()     const { return prev_error_vy; }
 
         // In-place rotation (integrates gyroZ into heading so PID stays valid)
         void RotateCW(int speed);
