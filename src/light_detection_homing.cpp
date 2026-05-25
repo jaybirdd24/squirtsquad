@@ -152,7 +152,8 @@ static void runCoarseAlign()
         return;
     }
 
-    int speed = (abs(err) > 20) ? SPIN_SPEED / 2 : ALIGN_SPEED;
+    // int speed = (abs(err) > 20) ? SPIN_SPEED / 2 : ALIGN_SPEED;
+    int speed = (abs(err) > 20) ? SPIN_SPEED : ALIGN_SPEED + 170;
     if (err > 0) motors.RotateCCW(speed);
     else         motors.RotateCW(speed);
 }
