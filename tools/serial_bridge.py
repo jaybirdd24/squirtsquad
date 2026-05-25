@@ -2,8 +2,9 @@
 """
 serial_bridge.py — Real-time robot telemetry bridge
 
-Reads $S, $C, and $A CSV lines from the HC-12 wireless serial receiver (YP-05 USB adapter)
-and forwards each field as a UDP datagram to Teleplot (VS Code extension, port 47269).
+Reads $S, $C, $A CSV lines, and direct >name:value lines from the HC-12 wireless
+serial receiver (YP-05 USB adapter), then forwards each field as a UDP datagram
+to Teleplot (VS Code extension, port 47269).
 Also logs every raw line to a timestamped CSV file for post-run analysis.
 
 Usage:
@@ -61,6 +62,16 @@ def list_ports():
 def send_to_teleplot(sock, name, value):
     msg = f"{name}:{value}\n".encode()
     sock.sendto(msg, (TELEPLOT_HOST, TELEPLOT_PORT))
+
+
+def forward_direct_teleplot(line, sock):
+    if not line.startswith(">"):
+        return False
+    payload = line[1:]
+    if ":" not in payload:
+        return False
+    sock.sendto(f"{payload}\n".encode(), (TELEPLOT_HOST, TELEPLOT_PORT))
+    return True
 
 
 def parse_and_forward(line, sock, fields):
@@ -127,7 +138,9 @@ def main():
                     continue
                 line_count += 1
 
-                if line.startswith("$S,"):
+                if forward_direct_teleplot(line, sock):
+                    pass
+                elif line.startswith("$S,"):
                     parse_and_forward(line, sock, SENSOR_FIELDS)
                     # Update summary values
                     parts = line.split(",")[1:]
