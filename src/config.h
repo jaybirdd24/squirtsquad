@@ -10,12 +10,16 @@ namespace Config {
     constexpr uint8_t PIN_LIGHT_LONG_LEFT   = A6; // long range left of fan
     constexpr uint8_t PIN_LIGHT_CLOSE_LEFT  = A7; // close range left of fan
 
+    // Set true only for bench testing when the robot is already facing the light.
+    constexpr bool LIGHT_DIRECT_APPROACH_TEST_MODE = false;
+
     constexpr int           LIGHT_SCAN_SPIN_SPEED        = 200;
     constexpr float         LIGHT_SCAN_TARGET_DEG        = 360.0f;
     constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
     constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
     constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
     constexpr float         LIGHT_STOP_VOLTAGE_V         = 1.0f;
+    constexpr float         LIGHT_AVOID_DISABLE_V        = 1.6f;
     constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V = 0.25f;
     constexpr int           LIGHT_FINE_ALIGN_SPEED       = 100;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
@@ -23,11 +27,12 @@ namespace Config {
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
-    constexpr float FLC_DIRECTION_SELECT_CM = 35.0f;
+    constexpr float FLC_DIRECTION_SELECT_CM = 25.0f;
+    constexpr float FLC_AVOID_RELEASE_CM    = 32.0f;
     constexpr float FLC_SIDE_BIAS           = 180.0f;
     constexpr float FLC_SIDE_FULL_LEFT_MM   = 650.0f;
     constexpr float FLC_SIDE_FULL_RIGHT_MM  = 300.0f;
-    constexpr int   FLC_VX_FAR              = 150;
+    constexpr int   FLC_VX_FAR              = 180;
     constexpr int   FLC_VX_MEDIUM           = 85;
     constexpr int   FLC_VX_CLOSE            = 25;
     constexpr int   FLC_TURN_FAST           = 200;
@@ -36,6 +41,8 @@ namespace Config {
     constexpr int   FLC_STRAFE_SLOW         = 80;
     constexpr int   FLC_STRAFE_MEDIUM       = 130;
     constexpr int   FLC_STRAFE_FAST         = 200;
+    constexpr int   FLC_MIN_ESCAPE_STRAFE   = 180;
+    constexpr int   FLC_MIN_HOMING_VX       = 140;
 
     // ── Distances ────────────────────────────────────────────────────────
     constexpr float OBSTACLE_AVOID_MM = 150.0f; // either front IR threshold to trigger avoidance (mm)

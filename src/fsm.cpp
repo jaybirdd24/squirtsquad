@@ -195,8 +195,14 @@ void FSM::initialising() {
         motors.resetHeading();
         motors.latchHeading();
         resetLightScan();
-        state = State::SCANNING;
-        Serial.println(F("# Heading_deg,A4_V,A5_V,A6_V,A7_V"));
+        if (Config::LIGHT_DIRECT_APPROACH_TEST_MODE) {
+            state = State::APPROACH_LIGHT;
+            Serial.println(F("# Direct approach test mode: face the robot at the light"));
+            Serial.println(F("# off,obs_cm,side,dir,vx,vy,wz,frontA_mm,frontB_mm,left_mm,right_mm,sonar_cm,A4_V,A4_raw,A5_raw,A6_raw,A7_V,A7_raw"));
+        } else {
+            state = State::SCANNING;
+            Serial.println(F("# Heading_deg,A4_V,A5_V,A6_V,A7_V"));
+        }
     }
 }
 
@@ -370,17 +376,24 @@ float FSM::sideClearancePreference() const
 
 int FSM::selectAvoidDirectionForApproach(float obstacleCm)
 {
-    bool obstacleRelevant = obstacleCm <= Config::FLC_DIRECTION_SELECT_CM ||
-                            forwardObstacleDetected();
+    bool frontABlocked = validDistance(distFrontA) &&
+                         distFrontA <= Config::OBSTACLE_AVOID_MM;
+    bool frontBBlocked = validDistance(distFrontB) &&
+                         distFrontB <= Config::OBSTACLE_AVOID_MM;
+    bool oneFrontSensorBlocked = frontABlocked != frontBBlocked;
+    bool obstacleRelevant = forwardObstacleDetected() ||
+                            obstacleCm <= Config::FLC_DIRECTION_SELECT_CM;
 
     if (!obstacleRelevant) {
-        if (obstacleCm >= 55.0f) {
+        if (obstacleCm >= Config::FLC_AVOID_RELEASE_CM) {
             avoidDirection = 0;
         }
         return 0;
     }
 
-    bool canReuseDirection = avoidDirection != 0 && sideClearForDirection(avoidDirection);
+    bool canReuseDirection = !oneFrontSensorBlocked &&
+                             avoidDirection != 0 &&
+                             sideClearForDirection(avoidDirection);
     if (!canReuseDirection) {
         avoidDirection = chooseAvoidDirection();
     }
@@ -510,6 +523,8 @@ void FSM::approachLight()
 {
     float closeRightV = adcToVolts(lightCloseRightRaw);
     float closeLeftV = adcToVolts(lightCloseLeftRaw);
+    bool closeToLight = closeRightV <= Config::LIGHT_AVOID_DISABLE_V ||
+                        closeLeftV <= Config::LIGHT_AVOID_DISABLE_V;
 
     if (closeRightV <= Config::LIGHT_STOP_VOLTAGE_V ||
         closeLeftV <= Config::LIGHT_STOP_VOLTAGE_V)
@@ -528,17 +543,34 @@ void FSM::approachLight()
     float fireOffset = (float)lightLongLeftRaw - (float)lightLongRightRaw;
     float obstacleCm = nearestForwardObstacleCm();
     int selectedAvoidDirection = selectAvoidDirectionForApproach(obstacleCm);
-    float sidePreference = sideClearancePreference();
-
-    if (selectedAvoidDirection != 0 && obstacleCm <= Config::FLC_DIRECTION_SELECT_CM) {
-        sidePreference = constrain(sidePreference +
-                                   selectedAvoidDirection * Config::FLC_SIDE_BIAS,
-                                   -500.0f, 500.0f);
+    if (closeToLight) {
+        avoidDirection = 0;
+        selectedAvoidDirection = 0;
     }
 
+    bool avoidingObstacle = !closeToLight &&
+                            selectedAvoidDirection != 0 &&
+                            (forwardObstacleDetected() ||
+                             obstacleCm <= Config::FLC_DIRECTION_SELECT_CM);
+    float sidePreference = avoidingObstacle ? sideClearancePreference() : 0.0f;
+
+    if (avoidingObstacle) {
+        sidePreference = selectedAvoidDirection * 300.0f;
+    }
+
+    float controlObstacleCm = avoidingObstacle ? obstacleCm : 80.0f;
+
     int vx, vy, wz;
-    fuzzyApproach(fireOffset, obstacleCm, sidePreference, selectedAvoidDirection,
+    fuzzyApproach(fireOffset, controlObstacleCm, sidePreference, selectedAvoidDirection,
                   vx, vy, wz);
+
+    if (avoidingObstacle) {
+        if (abs(vy) < Config::FLC_MIN_ESCAPE_STRAFE) {
+            vy = selectedAvoidDirection * Config::FLC_MIN_ESCAPE_STRAFE;
+        }
+    } else if (vx < Config::FLC_MIN_HOMING_VX) {
+        vx = Config::FLC_MIN_HOMING_VX;
+    }
 
     motors.drive(vx, vy, wz);
 
@@ -558,7 +590,18 @@ void FSM::approachLight()
         Serial.print(F(" dir="));           Serial.print(selectedAvoidDirection);
         Serial.print(F(" vx="));            Serial.print(vx);
         Serial.print(F(" vy="));            Serial.print(vy);
-        Serial.print(F(" wz="));            Serial.println(wz);
+        Serial.print(F(" wz="));            Serial.print(wz);
+        Serial.print(F(" frontA="));        Serial.print(distFrontA, 1);
+        Serial.print(F(" frontB="));        Serial.print(distFrontB, 1);
+        Serial.print(F(" left="));          Serial.print(distLeft, 1);
+        Serial.print(F(" right="));         Serial.print(distRight, 1);
+        Serial.print(F(" sonar="));         Serial.print(distSonar, 1);
+        Serial.print(F(" A4="));            Serial.print(closeRightV, 3);
+        Serial.print(F(" A4raw="));         Serial.print(lightCloseRightRaw);
+        Serial.print(F(" A5raw="));         Serial.print(lightLongRightRaw);
+        Serial.print(F(" A6raw="));         Serial.print(lightLongLeftRaw);
+        Serial.print(F(" A7="));            Serial.print(closeLeftV, 3);
+        Serial.print(F(" A7raw="));         Serial.println(lightCloseLeftRaw);
     }
 }
 
@@ -627,13 +670,22 @@ int FSM::chooseAvoidDirection() const {
     bool rightClear = !validDistance(distRight) ||
                       distRight >= Config::SIDE_CLEAR_MIN_MM;
 
+    if (frontABlocked != frontBBlocked) {
+        bool blockedSideIsLeft = frontABlocked == Config::FRONT_A_IS_LEFT;
+        int awayFromBlockedSide = blockedSideIsLeft ? -1 : 1;
+        int oppositeSide = -awayFromBlockedSide;
+
+        if (sideClearForDirection(awayFromBlockedSide)) return awayFromBlockedSide;
+        if (sideClearForDirection(oppositeSide)) return oppositeSide;
+        return 0;
+    }
+
     if (leftClear && !rightClear) return 1;
     if (rightClear && !leftClear) return -1;
     if (!leftClear && !rightClear) return 0;
 
-    if (frontABlocked != frontBBlocked) {
-        bool blockedSideIsLeft = frontABlocked == Config::FRONT_A_IS_LEFT;
-        direction = blockedSideIsLeft ? -1 : 1;
+    if (frontABlocked && frontBBlocked) {
+        direction = (distLeft >= distRight) ? 1 : -1;
     } else if (validDistance(distLeft) && validDistance(distRight)) {
         if (distLeft > distRight + Config::SIDE_CLEAR_MARGIN_MM) {
             direction = 1;
