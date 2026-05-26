@@ -69,7 +69,8 @@ private:
     float         lastSidePreference;
 
     // ── Avoid-obstacle data ───────────────────────────────────────────
-    int           avoidDirection; // +1 = left first, -1 = right first
+    int           avoidDirection;        // +1 = left first, -1 = right first
+    unsigned long avoidSuppressUntilMs;  // obstacle avoidance suppressed until this timestamp
 
     // ── Startup data ──────────────────────────────────────────────────
     unsigned long lastGyroBiasMs;

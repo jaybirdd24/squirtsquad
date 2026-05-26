@@ -125,6 +125,7 @@ FSM::FSM()
       lastObstacleCm(80.0f),
       lastSidePreference(0.0f),
       avoidDirection(0),
+      avoidSuppressUntilMs(0),
       lastGyroBiasMs(0),
       gyroBiasSamples(0),
       lastTickMs(0)
@@ -214,6 +215,7 @@ void FSM::resetLightScan()
     fineAlignStartMs = 0;
     targetHeading = 0.0f;
     avoidDirection = 0;
+    avoidSuppressUntilMs = 0;
     lastVx = lastVy = lastWz = 0;
     lastFireOffset = 0.0f;
     lastObstacleCm = 80.0f;
@@ -522,9 +524,18 @@ void FSM::fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference
 void FSM::approachLight()
 {
     float closeRightV = adcToVolts(lightCloseRightRaw);
-    float closeLeftV = adcToVolts(lightCloseLeftRaw);
-    bool closeToLight = closeRightV <= Config::LIGHT_AVOID_DISABLE_V ||
-                        closeLeftV <= Config::LIGHT_AVOID_DISABLE_V;
+    float closeLeftV  = adcToVolts(lightCloseLeftRaw);
+
+    unsigned long now2 = millis();
+    if (closeRightV <= Config::LIGHT_CLOSE_SUPPRESS_V ||
+        closeLeftV  <= Config::LIGHT_CLOSE_SUPPRESS_V) {
+        avoidSuppressUntilMs = now2 + Config::LIGHT_CLOSE_SUPPRESS_MS;
+    }
+    bool avoidanceSuppressed = now2 < avoidSuppressUntilMs;
+
+    bool closeToLight = avoidanceSuppressed ||
+                        closeRightV <= Config::LIGHT_AVOID_DISABLE_V ||
+                        closeLeftV  <= Config::LIGHT_AVOID_DISABLE_V;
 
     if (closeRightV <= Config::LIGHT_STOP_VOLTAGE_V ||
         closeLeftV <= Config::LIGHT_STOP_VOLTAGE_V)
@@ -581,9 +592,8 @@ void FSM::approachLight()
     lastObstacleCm = obstacleCm;
     lastSidePreference = sidePreference;
 
-    unsigned long now = millis();
-    if (now - lastLightLogMs >= Config::LIGHT_LOG_INTERVAL_MS) {
-        lastLightLogMs = now;
+    if (now2 - lastLightLogMs >= Config::LIGHT_LOG_INTERVAL_MS) {
+        lastLightLogMs = now2;
         Serial.print(F("# approach off=")); Serial.print(fireOffset, 1);
         Serial.print(F(" obs_cm="));        Serial.print(obstacleCm, 1);
         Serial.print(F(" side="));          Serial.print(sidePreference, 1);
