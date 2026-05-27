@@ -23,13 +23,13 @@ namespace Config {
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
     constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V = 0.25f;
-    constexpr int           LIGHT_FINE_ALIGN_SPEED       = 100;
+    constexpr int           LIGHT_FINE_ALIGN_SPEED       = 150;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
-    constexpr float FLC_DIRECTION_SELECT_CM = 15.0f;
+    constexpr float FLC_DIRECTION_SELECT_CM = 14.0f;
     constexpr float FLC_AVOID_RELEASE_CM    = 32.0f;
     constexpr float FLC_SIDE_BIAS           = 180.0f;
     constexpr float FLC_SIDE_FULL_LEFT_MM   = 650.0f;
@@ -52,11 +52,11 @@ namespace Config {
     constexpr int   SIDE_GUARD_ESCAPE_STRAFE  = FLC_MIN_ESCAPE_STRAFE;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 50.0f; // either front IR threshold to trigger avoidance (mm)
-    constexpr float OBSTACLE_SONAR_CM = 5.0f;  // sonar threshold to trigger avoidance (cm)
-    constexpr float OBSTACLE_CLEAR_MM = 170.0f; // front-left/front-right IR must rise above this to count as clear
+    constexpr float OBSTACLE_AVOID_MM = 60.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_SONAR_CM = 6.0f;  // sonar threshold to trigger avoidance (cm)
+    constexpr float OBSTACLE_CLEAR_MM = 120.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 26.0f; // sonar must rise above this to count as clear
-    constexpr float SIDE_CLEAR_MIN_MM = 80.0f; // side gap preferred before strafing toward that side
+    constexpr float SIDE_CLEAR_MIN_MM = 50.0f; // side gap preferred before strafing toward that side
     constexpr float SIDE_CLEAR_MARGIN_MM = 50.0f; // side-gap difference to override direction
 
     // ── Speeds (0–1000) ──────────────────────────────────────────────────

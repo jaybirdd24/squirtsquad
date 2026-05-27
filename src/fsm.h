@@ -72,6 +72,10 @@ private:
     int           avoidDirection;        // +1 = left first, -1 = right first
     unsigned long avoidSuppressUntilMs;  // obstacle avoidance suppressed until this timestamp
 
+    // ── Multi-light tracking ──────────────────────────────────────────
+    int           lightsFound;           // number of lights reached so far
+    unsigned long alignedAtMs;           // timestamp when first ALIGNED was entered
+
     // ── Startup data ──────────────────────────────────────────────────
     unsigned long lastGyroBiasMs;
     unsigned long gyroBiasSamples;
@@ -89,6 +93,7 @@ private:
     void coarseAlignToLight();
     void approachLight();
     void fineAlignToLight();
+    void aligned();
 
     // ── Light helpers ─────────────────────────────────────────────────
     void  resetLightScan();

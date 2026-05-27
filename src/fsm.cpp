@@ -126,6 +126,8 @@ FSM::FSM()
       lastSidePreference(0.0f),
       avoidDirection(0),
       avoidSuppressUntilMs(0),
+      lightsFound(0),
+      alignedAtMs(0),
       lastGyroBiasMs(0),
       gyroBiasSamples(0),
       lastTickMs(0)
@@ -160,7 +162,7 @@ void FSM::fsmUpdate() {
         case State::COARSE_ALIGN:   coarseAlignToLight();  break;
         case State::APPROACH_LIGHT: approachLight();       break;
         case State::FINE_ALIGN:     fineAlignToLight();    break;
-        case State::ALIGNED:        motors.Stop(true);     break;
+        case State::ALIGNED:        aligned();             break;
     }
 
     sendTelemetry();
@@ -216,6 +218,7 @@ void FSM::resetLightScan()
     targetHeading = 0.0f;
     avoidDirection = 0;
     avoidSuppressUntilMs = 0;
+    alignedAtMs = 0;
     lastVx = lastVy = lastWz = 0;
     lastFireOffset = 0.0f;
     lastObstacleCm = 80.0f;
@@ -735,6 +738,26 @@ void FSM::fineAlignToLight()
     delay(20);
     motors.Stop(true);
     delay(30);
+}
+
+void FSM::aligned()
+{
+    motors.Stop(true);
+
+    if (lightsFound < 1) {
+        if (alignedAtMs == 0) {
+            alignedAtMs = millis();
+            Serial.println(F("# Light 1 reached. Waiting 5s before scanning for light 2..."));
+        }
+        if (millis() - alignedAtMs >= 5000) {
+            lightsFound++;
+            resetLightScan();
+            motors.resetHeading();
+            motors.latchHeading();
+            Serial.println(F("# Scanning for light 2..."));
+            state = State::SCANNING;
+        }
+    }
 }
 
 bool FSM::forwardObstacleDetected() const {
