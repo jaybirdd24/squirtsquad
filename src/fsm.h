@@ -75,6 +75,9 @@ private:
     // ── Multi-light tracking ──────────────────────────────────────────
     int           lightsFound;           // number of lights reached so far
     unsigned long alignedAtMs;           // timestamp when first ALIGNED was entered
+    unsigned long lastExtinguishLogMs;
+    float         extinguishBaselineRightV;
+    float         extinguishBaselineLeftV;
 
     // ── Startup data ──────────────────────────────────────────────────
     unsigned long lastGyroBiasMs;
@@ -98,6 +101,7 @@ private:
     // ── Light helpers ─────────────────────────────────────────────────
     void  resetLightScan();
     float analyzeScans();
+    void  setFanDuty(uint8_t duty) const;
     float nearestForwardObstacleCm() const;
     float sideClearancePreference() const;
     bool  obstacleRelevantForApproach(float obstacleCm) const;

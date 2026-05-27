@@ -41,6 +41,16 @@ namespace {
         return (a < b) ? a : b;
     }
 
+    float maxf(float a, float b)
+    {
+        return (a > b) ? a : b;
+    }
+
+    uint8_t fanOutputForDuty(uint8_t duty)
+    {
+        return Config::FAN_ACTIVE_HIGH ? duty : 255 - duty;
+    }
+
     float trimf(float x, float a, float b, float c)
     {
         if (a == b) {
@@ -128,6 +138,9 @@ FSM::FSM()
       avoidSuppressUntilMs(0),
       lightsFound(0),
       alignedAtMs(0),
+      lastExtinguishLogMs(0),
+      extinguishBaselineRightV(5.0f),
+      extinguishBaselineLeftV(5.0f),
       lastGyroBiasMs(0),
       gyroBiasSamples(0),
       lastTickMs(0)
@@ -141,6 +154,8 @@ void FSM::fsmInit() {
     radio.init(115200);
     motors.enable();
     motors.Stop(true);
+    pinMode(Config::PIN_FAN, OUTPUT);
+    setFanDuty(0);
 
     state = State::INITIALISING;
     lastTickMs = millis();
@@ -219,6 +234,9 @@ void FSM::resetLightScan()
     avoidDirection = 0;
     avoidSuppressUntilMs = 0;
     alignedAtMs = 0;
+    lastExtinguishLogMs = 0;
+    extinguishBaselineRightV = 5.0f;
+    extinguishBaselineLeftV = 5.0f;
     lastVx = lastVy = lastWz = 0;
     lastFireOffset = 0.0f;
     lastObstacleCm = 80.0f;
@@ -302,6 +320,11 @@ float FSM::analyzeScans()
     Serial.println(F(" deg"));
 
     return result;
+}
+
+void FSM::setFanDuty(uint8_t duty) const
+{
+    analogWrite(Config::PIN_FAN, fanOutputForDuty(duty));
 }
 
 void FSM::analyzeLightScan()
@@ -744,19 +767,81 @@ void FSM::aligned()
 {
     motors.Stop(true);
 
-    if (lightsFound < 1) {
-        if (alignedAtMs == 0) {
-            alignedAtMs = millis();
-            Serial.println(F("# Light 1 reached. Waiting 5s before scanning for light 2..."));
+    if (lightsFound >= Config::FIRES_TO_EXTINGUISH) {
+        setFanDuty(0);
+        return;
+    }
+
+    unsigned long now = millis();
+    float closeRightV = adcToVolts(lightCloseRightRaw);
+    float closeLeftV = adcToVolts(lightCloseLeftRaw);
+    float closeMinV = minf(closeRightV, closeLeftV);
+    float closeRightRise = closeRightV - extinguishBaselineRightV;
+    float closeLeftRise = closeLeftV - extinguishBaselineLeftV;
+    float closeMaxRise = maxf(closeRightRise, closeLeftRise);
+
+    if (alignedAtMs == 0) {
+        alignedAtMs = now;
+        lastExtinguishLogMs = 0;
+        extinguishBaselineRightV = closeRightV;
+        extinguishBaselineLeftV = closeLeftV;
+        setFanDuty(Config::FAN_FULL_DUTY);
+
+        Serial.print(F("# Fire "));
+        Serial.print(lightsFound + 1);
+        Serial.print(F(" aligned. Fan 100%; baseline A4="));
+        Serial.print(extinguishBaselineRightV, 3);
+        Serial.print(F(" A7="));
+        Serial.println(extinguishBaselineLeftV, 3);
+    } else {
+        setFanDuty(Config::FAN_FULL_DUTY);
+    }
+
+    closeRightRise = closeRightV - extinguishBaselineRightV;
+    closeLeftRise = closeLeftV - extinguishBaselineLeftV;
+    closeMaxRise = maxf(closeRightRise, closeLeftRise);
+
+    bool voltageSpiked = closeMaxRise >= Config::LIGHT_EXTINGUISHED_SPIKE_V;
+    bool voltageHigh = closeMinV >= Config::LIGHT_EXTINGUISHED_MIN_V;
+    bool extinguished = voltageSpiked || voltageHigh;
+    bool timedOut = (now - alignedAtMs) >= Config::LIGHT_EXTINGUISH_MAX_MS;
+
+    if (now - lastExtinguishLogMs >= Config::LIGHT_EXTINGUISH_LOG_MS) {
+        lastExtinguishLogMs = now;
+        Serial.print(F("# extinguish fire="));
+        Serial.print(lightsFound + 1);
+        Serial.print(F(" fan=100 A4="));
+        Serial.print(closeRightV, 3);
+        Serial.print(F(" A7="));
+        Serial.print(closeLeftV, 3);
+        Serial.print(F(" min="));
+        Serial.print(closeMinV, 3);
+        Serial.print(F(" riseA4="));
+        Serial.print(closeRightRise, 3);
+        Serial.print(F(" riseA7="));
+        Serial.print(closeLeftRise, 3);
+        Serial.print(F(" maxRise="));
+        Serial.println(closeMaxRise, 3);
+    }
+
+    if (extinguished || timedOut) {
+        setFanDuty(0);
+        lightsFound++;
+
+        Serial.print(F("# Fire "));
+        Serial.print(lightsFound);
+        Serial.println(timedOut ? F(" fan timeout; proceeding") : F(" extinguished; fan off"));
+
+        if (lightsFound >= Config::FIRES_TO_EXTINGUISH) {
+            Serial.println(F("# Second fire extinguished. Stopping."));
+            return;
         }
-        if (millis() - alignedAtMs >= 5000) {
-            lightsFound++;
-            resetLightScan();
-            motors.resetHeading();
-            motors.latchHeading();
-            Serial.println(F("# Scanning for light 2..."));
-            state = State::SCANNING;
-        }
+
+        resetLightScan();
+        motors.resetHeading();
+        motors.latchHeading();
+        Serial.println(F("# Scanning for light 2..."));
+        state = State::SCANNING;
     }
 }
 

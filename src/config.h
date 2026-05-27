@@ -10,9 +10,14 @@ namespace Config {
     constexpr uint8_t PIN_LIGHT_LONG_LEFT   = A6; // long range left of fan
     constexpr uint8_t PIN_LIGHT_CLOSE_LEFT  = A7; // close range left of fan
 
+    constexpr uint8_t PIN_FAN = 5;
+    constexpr bool    FAN_ACTIVE_HIGH = true;
+    constexpr uint8_t FAN_FULL_DUTY = 255;
+
     // Set true only for bench testing when the robot is already facing the light.
     constexpr bool LIGHT_DIRECT_APPROACH_TEST_MODE = false;
 
+    constexpr int           FIRES_TO_EXTINGUISH       = 2;
     constexpr int           LIGHT_SCAN_SPIN_SPEED        = 200;
     constexpr float         LIGHT_SCAN_TARGET_DEG        = 360.0f;
     constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
@@ -26,6 +31,10 @@ namespace Config {
     constexpr int           LIGHT_FINE_ALIGN_SPEED       = 150;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
+    constexpr unsigned long LIGHT_EXTINGUISH_MAX_MS       = 10000;
+    constexpr unsigned long LIGHT_EXTINGUISH_LOG_MS       = 250;
+    constexpr float         LIGHT_EXTINGUISHED_SPIKE_V    = 1.0f;
+    constexpr float         LIGHT_EXTINGUISHED_MIN_V      = 3.0f;
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
