@@ -71,6 +71,8 @@ private:
     // ── Avoid-obstacle data ───────────────────────────────────────────
     int           avoidDirection;        // +1 = left first, -1 = right first
     unsigned long avoidSuppressUntilMs;  // obstacle avoidance suppressed until this timestamp
+    int           sideGuardBlockedSide;  // +1 = left latched, -1 = right latched
+    unsigned long sideGuardHoldUntilMs;  // minimum hold time for side guard latch
 
     // ── Multi-light tracking ──────────────────────────────────────────
     int           lightsFound;           // number of lights reached so far
@@ -108,7 +110,7 @@ private:
     int   selectAvoidDirectionForApproach(float obstacleCm);
     void  fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference,
                         int avoidDirection, int &vx, int &vy, int &wz) const;
-    char  applySideGuard(int &vx, int &vy, int &wz) const;
+    char  applySideGuard(int &vx, int &vy, int &wz);
 
     // ── Avoidance helpers ─────────────────────────────────────────────
     bool forwardObstacleDetected() const;

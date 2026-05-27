@@ -136,6 +136,8 @@ FSM::FSM()
       lastSidePreference(0.0f),
       avoidDirection(0),
       avoidSuppressUntilMs(0),
+      sideGuardBlockedSide(0),
+      sideGuardHoldUntilMs(0),
       lightsFound(0),
       alignedAtMs(0),
       lastExtinguishLogMs(0),
@@ -216,7 +218,7 @@ void FSM::initialising() {
         if (Config::LIGHT_DIRECT_APPROACH_TEST_MODE) {
             state = State::APPROACH_LIGHT;
             Serial.println(F("# Direct approach test mode: face the robot at the light"));
-            Serial.println(F("# off,obs_cm,side,dir,vx,vy,wz,frontA_mm,frontB_mm,left_mm,right_mm,sonar_cm,A4_V,A4_raw,A5_raw,A6_raw,A7_V,A7_raw"));
+            Serial.println(F("# off,obs_cm,side,dir,guard,vx,vy,wz,frontA_mm,frontB_mm,left_mm,right_mm,sonar_cm,A4_V,A4_raw,A5_raw,A6_raw,A7_V,A7_raw"));
         } else {
             state = State::SCANNING;
             Serial.println(F("# Heading_deg,A4_V,A5_V,A6_V,A7_V"));
@@ -233,6 +235,8 @@ void FSM::resetLightScan()
     targetHeading = 0.0f;
     avoidDirection = 0;
     avoidSuppressUntilMs = 0;
+    sideGuardBlockedSide = 0;
+    sideGuardHoldUntilMs = 0;
     alignedAtMs = 0;
     lastExtinguishLogMs = 0;
     extinguishBaselineRightV = 5.0f;
@@ -552,8 +556,27 @@ void FSM::fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference
                    -Config::FLC_TURN_FAST, Config::FLC_TURN_FAST);
 }
 
-char FSM::applySideGuard(int &vx, int &vy, int &wz) const
+char FSM::applySideGuard(int &vx, int &vy, int &wz)
 {
+    unsigned long now = millis();
+
+    if (sideGuardBlockedSide != 0) {
+        bool holdElapsed = (long)(now - sideGuardHoldUntilMs) >= 0;
+        bool releaseClear = false;
+
+        if (sideGuardBlockedSide > 0) {
+            releaseClear = validDistance(distLeft) &&
+                           distLeft >= Config::SIDE_GUARD_RELEASE_MM;
+        } else {
+            releaseClear = validDistance(distRight) &&
+                           distRight >= Config::SIDE_GUARD_RELEASE_MM;
+        }
+
+        if (holdElapsed && releaseClear) {
+            sideGuardBlockedSide = 0;
+        }
+    }
+
     bool leftCaution = validDistance(distLeft) &&
                        distLeft <= Config::SIDE_GUARD_CAUTION_MM;
     bool rightCaution = validDistance(distRight) &&
@@ -563,58 +586,105 @@ char FSM::applySideGuard(int &vx, int &vy, int &wz) const
     bool rightBlocked = validDistance(distRight) &&
                         distRight <= Config::SIDE_GUARD_BLOCK_MM;
 
-    if (!leftCaution && !rightCaution) {
+    bool leftLatched = sideGuardBlockedSide > 0;
+    bool rightLatched = sideGuardBlockedSide < 0;
+    bool leftActive = leftCaution || leftLatched;
+    bool rightActive = rightCaution || rightLatched;
+
+    if (!leftActive && !rightActive) {
         return '0';
     }
 
-    if (leftBlocked && rightBlocked) {
-        vx = 0;
+    bool frontBlocked = obstacleRelevantForApproach(nearestForwardObstacleCm());
+    bool commandIntoLeft = vy > Config::SIDE_GUARD_STRAFE_INTO_MIN ||
+                           wz < -Config::SIDE_GUARD_ARC_WZ_MIN;
+    bool commandIntoRight = vy < -Config::SIDE_GUARD_STRAFE_INTO_MIN ||
+                            wz > Config::SIDE_GUARD_ARC_WZ_MIN;
+
+    if (leftActive && rightActive) {
+        if (frontBlocked) {
+            vx = 0;
+        } else if (vx > Config::SIDE_GUARD_STRAIGHT_MAX_VX) {
+            vx = Config::SIDE_GUARD_STRAIGHT_MAX_VX;
+        }
         vy = 0;
         wz = 0;
         return 'B';
     }
 
-    if (leftBlocked) {
-        if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
-            vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
+    if (leftActive) {
+        if (vx > Config::SIDE_GUARD_STRAIGHT_MAX_VX) {
+            vx = Config::SIDE_GUARD_STRAIGHT_MAX_VX;
         }
-        if (vy > -Config::SIDE_GUARD_ESCAPE_STRAFE) {
-            vy = -Config::SIDE_GUARD_ESCAPE_STRAFE;
+
+        if (commandIntoLeft) {
+            sideGuardBlockedSide = 1;
+            sideGuardHoldUntilMs = now + Config::SIDE_GUARD_HOLD_MS;
+
+            if (leftBlocked) {
+                if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
+                    vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
+                }
+                if (vy > -Config::SIDE_GUARD_ESCAPE_STRAFE) {
+                    vy = -Config::SIDE_GUARD_ESCAPE_STRAFE;
+                }
+            } else if (vy > 0) {
+                vy = 0;
+            }
+
+            if (wz < 0) {
+                wz = 0;
+            }
+            return 'L';
         }
-        wz = 0;
+
+        if (leftLatched) {
+            if (vy > 0) {
+                vy = 0;
+            }
+            if (wz < 0) {
+                wz = 0;
+            }
+        }
+
         return 'L';
     }
 
-    if (rightBlocked) {
-        if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
-            vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
+    if (rightActive) {
+        if (vx > Config::SIDE_GUARD_STRAIGHT_MAX_VX) {
+            vx = Config::SIDE_GUARD_STRAIGHT_MAX_VX;
         }
-        if (vy < Config::SIDE_GUARD_ESCAPE_STRAFE) {
-            vy = Config::SIDE_GUARD_ESCAPE_STRAFE;
-        }
-        wz = 0;
-        return 'R';
-    }
 
-    if (vx > Config::SIDE_GUARD_MAX_CAUTION_VX) {
-        vx = Config::SIDE_GUARD_MAX_CAUTION_VX;
-    }
-    wz = 0;
+        if (commandIntoRight) {
+            sideGuardBlockedSide = -1;
+            sideGuardHoldUntilMs = now + Config::SIDE_GUARD_HOLD_MS;
 
-    if (leftCaution && rightCaution) {
-        vy = 0;
-        return 'B';
-    }
-    if (leftCaution) {
-        if (vy > 0) {
-            vy = 0;
+            if (rightBlocked) {
+                if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
+                    vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
+                }
+                if (vy < Config::SIDE_GUARD_ESCAPE_STRAFE) {
+                    vy = Config::SIDE_GUARD_ESCAPE_STRAFE;
+                }
+            } else if (vy < 0) {
+                vy = 0;
+            }
+
+            if (wz > 0) {
+                wz = 0;
+            }
+            return 'R';
         }
-        return 'L';
-    }
-    if (rightCaution) {
-        if (vy < 0) {
-            vy = 0;
+
+        if (rightLatched) {
+            if (vy < 0) {
+                vy = 0;
+            }
+            if (wz > 0) {
+                wz = 0;
+            }
         }
+
         return 'R';
     }
 
