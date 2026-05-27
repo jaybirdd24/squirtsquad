@@ -66,7 +66,7 @@ namespace Config {
     constexpr unsigned long SIDE_GUARD_HOLD_MS = 600;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 60.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_AVOID_MM = 72.0f; // either front IR threshold to trigger avoidance (mm)
     constexpr float OBSTACLE_SONAR_CM = 6.0f;  // sonar threshold to trigger avoidance (cm)
     constexpr float OBSTACLE_CLEAR_MM = 120.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 26.0f; // sonar must rise above this to count as clear
