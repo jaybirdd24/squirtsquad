@@ -4,12 +4,73 @@
 
 namespace Config {
 
+    // -- Light homing ----------------------------------------------------------
+    constexpr uint8_t PIN_LIGHT_CLOSE_RIGHT = A4; // close range right of fan
+    constexpr uint8_t PIN_LIGHT_LONG_RIGHT  = A5; // long range right of fan
+    constexpr uint8_t PIN_LIGHT_LONG_LEFT   = A6; // long range left of fan
+    constexpr uint8_t PIN_LIGHT_CLOSE_LEFT  = A7; // close range left of fan
+
+    constexpr uint8_t PIN_FAN = 5;
+    constexpr bool    FAN_ACTIVE_HIGH = true;
+    constexpr uint8_t FAN_FULL_DUTY = 255;
+
+    // Set true only for bench testing when the robot is already facing the light.
+    constexpr bool LIGHT_DIRECT_APPROACH_TEST_MODE = false;
+
+    constexpr int           FIRES_TO_EXTINGUISH       = 2;
+    constexpr int           LIGHT_SCAN_SPIN_SPEED        = 200;
+    constexpr float         LIGHT_SCAN_TARGET_DEG        = 360.0f;
+    constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
+    constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
+    constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
+    constexpr float         LIGHT_STOP_VOLTAGE_V         = 1.0f;
+    constexpr float         LIGHT_AVOID_DISABLE_V        = 1.0f;
+    constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
+    constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
+    constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V = 0.25f;
+    constexpr int           LIGHT_FINE_ALIGN_SPEED       = 150;
+    constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
+    constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
+    constexpr unsigned long LIGHT_EXTINGUISH_MAX_MS       = 10000;
+    constexpr unsigned long LIGHT_EXTINGUISH_LOG_MS       = 250;
+    constexpr float         LIGHT_EXTINGUISHED_SPIKE_V    = 1.0f;
+    constexpr float         LIGHT_EXTINGUISHED_MIN_V      = 3.0f;
+
+    // Fuzzy light-approach outputs. Signs match movement::drive():
+    // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
+    constexpr float FLC_DIRECTION_SELECT_CM = 14.0f;
+    constexpr float FLC_AVOID_RELEASE_CM    = 32.0f;
+    constexpr float FLC_SIDE_BIAS           = 180.0f;
+    constexpr float FLC_SIDE_FULL_LEFT_MM   = 650.0f;
+    constexpr float FLC_SIDE_FULL_RIGHT_MM  = 300.0f;
+    constexpr int   FLC_VX_FAR              = 180;
+    constexpr int   FLC_VX_MEDIUM           = 85;
+    constexpr int   FLC_VX_CLOSE            = 25;
+    constexpr int   FLC_TURN_FAST           = 200;
+    constexpr int   FLC_TURN_MEDIUM         = 110;
+    constexpr int   FLC_TURN_SLOW           = 50;
+    constexpr int   FLC_STRAFE_SLOW         = 80;
+    constexpr int   FLC_STRAFE_MEDIUM       = 130;
+    constexpr int   FLC_STRAFE_FAST         = 200;
+    constexpr int   FLC_MIN_ESCAPE_STRAFE   = 180;
+    constexpr int   FLC_MIN_HOMING_VX       = 140;
+    constexpr float SIDE_GUARD_CAUTION_MM   = 170.0f;
+    constexpr float SIDE_GUARD_BLOCK_MM     = 120.0f;
+    constexpr int   SIDE_GUARD_MAX_CAUTION_VX = FLC_VX_MEDIUM;
+    constexpr int   SIDE_GUARD_MAX_BLOCKED_VX = FLC_VX_CLOSE;
+    constexpr int   SIDE_GUARD_ESCAPE_STRAFE  = FLC_MIN_ESCAPE_STRAFE;
+    constexpr int   SIDE_GUARD_STRAFE_INTO_MIN = 30;
+    constexpr int   SIDE_GUARD_ARC_WZ_MIN      = FLC_TURN_SLOW;
+    constexpr int   SIDE_GUARD_STRAIGHT_MAX_VX = FLC_VX_MEDIUM;
+    constexpr float SIDE_GUARD_RELEASE_MM      = 190.0f;
+    constexpr unsigned long SIDE_GUARD_HOLD_MS = 600;
+
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 150.0f; // either front IR threshold to trigger avoidance (mm)
-    constexpr float OBSTACLE_SONAR_CM = 20.0f;  // sonar threshold to trigger avoidance (cm)
-    constexpr float OBSTACLE_CLEAR_MM = 170.0f; // front-left/front-right IR must rise above this to count as clear
+    constexpr float OBSTACLE_AVOID_MM = 72.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_SONAR_CM = 6.0f;  // sonar threshold to trigger avoidance (cm)
+    constexpr float OBSTACLE_CLEAR_MM = 120.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 26.0f; // sonar must rise above this to count as clear
-    constexpr float SIDE_CLEAR_MIN_MM = 180.0f; // side gap preferred before strafing toward that side
+    constexpr float SIDE_CLEAR_MIN_MM = 50.0f; // side gap preferred before strafing toward that side
     constexpr float SIDE_CLEAR_MARGIN_MM = 50.0f; // side-gap difference to override direction
 
     // ── Speeds (0–1000) ──────────────────────────────────────────────────

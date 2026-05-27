@@ -164,7 +164,7 @@ void movement::drive(int vx, int vy, int wz)
     // Mecanum IK — verified against existing motor sign conventions:
     //   vx+  → forward  (LF+, LR+, RR-, RF-)
     //   vy+  → strafe left (LF-, LR+, RR+, RF-)
-    //   wz+  → CCW rotation correction
+    //   wz+  → right/CW turn, matching RotateCW()
     setMotorSpeeds( vx - vy + wz,   // LF
                     vx + vy + wz,   // LR
                    -vx + vy + wz,   // RR
