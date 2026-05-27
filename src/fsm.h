@@ -95,9 +95,11 @@ private:
     float analyzeScans();
     float nearestForwardObstacleCm() const;
     float sideClearancePreference() const;
+    bool  obstacleRelevantForApproach(float obstacleCm) const;
     int   selectAvoidDirectionForApproach(float obstacleCm);
     void  fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference,
                         int avoidDirection, int &vx, int &vy, int &wz) const;
+    char  applySideGuard(int &vx, int &vy, int &wz) const;
 
     // ── Avoidance helpers ─────────────────────────────────────────────
     bool forwardObstacleDetected() const;

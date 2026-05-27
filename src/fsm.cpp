@@ -376,6 +376,12 @@ float FSM::sideClearancePreference() const
     return constrain((leftScore - rightScore) * 500.0f, -500.0f, 500.0f);
 }
 
+bool FSM::obstacleRelevantForApproach(float obstacleCm) const
+{
+    return forwardObstacleDetected() ||
+           obstacleCm <= Config::FLC_DIRECTION_SELECT_CM;
+}
+
 int FSM::selectAvoidDirectionForApproach(float obstacleCm)
 {
     bool frontABlocked = validDistance(distFrontA) &&
@@ -383,8 +389,7 @@ int FSM::selectAvoidDirectionForApproach(float obstacleCm)
     bool frontBBlocked = validDistance(distFrontB) &&
                          distFrontB <= Config::OBSTACLE_AVOID_MM;
     bool oneFrontSensorBlocked = frontABlocked != frontBBlocked;
-    bool obstacleRelevant = forwardObstacleDetected() ||
-                            obstacleCm <= Config::FLC_DIRECTION_SELECT_CM;
+    bool obstacleRelevant = obstacleRelevantForApproach(obstacleCm);
 
     if (!obstacleRelevant) {
         if (obstacleCm >= Config::FLC_AVOID_RELEASE_CM) {
@@ -521,6 +526,75 @@ void FSM::fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference
                    -Config::FLC_TURN_FAST, Config::FLC_TURN_FAST);
 }
 
+char FSM::applySideGuard(int &vx, int &vy, int &wz) const
+{
+    bool leftCaution = validDistance(distLeft) &&
+                       distLeft <= Config::SIDE_GUARD_CAUTION_MM;
+    bool rightCaution = validDistance(distRight) &&
+                        distRight <= Config::SIDE_GUARD_CAUTION_MM;
+    bool leftBlocked = validDistance(distLeft) &&
+                       distLeft <= Config::SIDE_GUARD_BLOCK_MM;
+    bool rightBlocked = validDistance(distRight) &&
+                        distRight <= Config::SIDE_GUARD_BLOCK_MM;
+
+    if (!leftCaution && !rightCaution) {
+        return '0';
+    }
+
+    if (leftBlocked && rightBlocked) {
+        vx = 0;
+        vy = 0;
+        wz = 0;
+        return 'B';
+    }
+
+    if (leftBlocked) {
+        if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
+            vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
+        }
+        if (vy > -Config::SIDE_GUARD_ESCAPE_STRAFE) {
+            vy = -Config::SIDE_GUARD_ESCAPE_STRAFE;
+        }
+        wz = 0;
+        return 'L';
+    }
+
+    if (rightBlocked) {
+        if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
+            vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
+        }
+        if (vy < Config::SIDE_GUARD_ESCAPE_STRAFE) {
+            vy = Config::SIDE_GUARD_ESCAPE_STRAFE;
+        }
+        wz = 0;
+        return 'R';
+    }
+
+    if (vx > Config::SIDE_GUARD_MAX_CAUTION_VX) {
+        vx = Config::SIDE_GUARD_MAX_CAUTION_VX;
+    }
+    wz = 0;
+
+    if (leftCaution && rightCaution) {
+        vy = 0;
+        return 'B';
+    }
+    if (leftCaution) {
+        if (vy > 0) {
+            vy = 0;
+        }
+        return 'L';
+    }
+    if (rightCaution) {
+        if (vy < 0) {
+            vy = 0;
+        }
+        return 'R';
+    }
+
+    return '0';
+}
+
 void FSM::approachLight()
 {
     float closeRightV = adcToVolts(lightCloseRightRaw);
@@ -553,6 +627,7 @@ void FSM::approachLight()
 
     float fireOffset = (float)lightLongLeftRaw - (float)lightLongRightRaw;
     float obstacleCm = nearestForwardObstacleCm();
+    bool obstacleRelevant = obstacleRelevantForApproach(obstacleCm);
     int selectedAvoidDirection = selectAvoidDirectionForApproach(obstacleCm);
     if (closeToLight) {
         avoidDirection = 0;
@@ -561,9 +636,13 @@ void FSM::approachLight()
 
     bool avoidingObstacle = !closeToLight &&
                             selectedAvoidDirection != 0 &&
-                            (forwardObstacleDetected() ||
-                             obstacleCm <= Config::FLC_DIRECTION_SELECT_CM);
-    float sidePreference = avoidingObstacle ? sideClearancePreference() : 0.0f;
+                            obstacleRelevant;
+    bool blockedWithoutEscape = !closeToLight &&
+                                obstacleRelevant &&
+                                selectedAvoidDirection == 0;
+    float sidePreference = (avoidingObstacle || blockedWithoutEscape)
+                         ? sideClearancePreference()
+                         : 0.0f;
 
     if (avoidingObstacle) {
         sidePreference = selectedAvoidDirection * 300.0f;
@@ -575,12 +654,22 @@ void FSM::approachLight()
     fuzzyApproach(fireOffset, controlObstacleCm, sidePreference, selectedAvoidDirection,
                   vx, vy, wz);
 
-    if (avoidingObstacle) {
+    char guardCode = '0';
+    if (blockedWithoutEscape) {
+        vx = 0;
+        vy = 0;
+        wz = 0;
+        guardCode = 'B';
+    } else if (avoidingObstacle) {
         if (abs(vy) < Config::FLC_MIN_ESCAPE_STRAFE) {
             vy = selectedAvoidDirection * Config::FLC_MIN_ESCAPE_STRAFE;
         }
     } else if (vx < Config::FLC_MIN_HOMING_VX) {
         vx = Config::FLC_MIN_HOMING_VX;
+    }
+
+    if (!blockedWithoutEscape) {
+        guardCode = applySideGuard(vx, vy, wz);
     }
 
     motors.drive(vx, vy, wz);
@@ -598,6 +687,7 @@ void FSM::approachLight()
         Serial.print(F(" obs_cm="));        Serial.print(obstacleCm, 1);
         Serial.print(F(" side="));          Serial.print(sidePreference, 1);
         Serial.print(F(" dir="));           Serial.print(selectedAvoidDirection);
+        Serial.print(F(" guard="));         Serial.print(guardCode);
         Serial.print(F(" vx="));            Serial.print(vx);
         Serial.print(F(" vy="));            Serial.print(vy);
         Serial.print(F(" wz="));            Serial.print(wz);
@@ -659,10 +749,12 @@ bool FSM::forwardObstacleDetected() const {
 
 bool FSM::sideClearForDirection(int direction) const {
     if (direction > 0) {
-        return !validDistance(distLeft) || distLeft >= Config::SIDE_CLEAR_MIN_MM;
+        return validDistance(distLeft) &&
+               distLeft >= Config::SIDE_GUARD_CAUTION_MM;
     }
     if (direction < 0) {
-        return !validDistance(distRight) || distRight >= Config::SIDE_CLEAR_MIN_MM;
+        return validDistance(distRight) &&
+               distRight >= Config::SIDE_GUARD_CAUTION_MM;
     }
     return false;
 }
@@ -675,10 +767,8 @@ int FSM::chooseAvoidDirection() const {
 
     int direction = -1;
 
-    bool leftClear = !validDistance(distLeft) ||
-                     distLeft >= Config::SIDE_CLEAR_MIN_MM;
-    bool rightClear = !validDistance(distRight) ||
-                      distRight >= Config::SIDE_CLEAR_MIN_MM;
+    bool leftClear = sideClearForDirection(1);
+    bool rightClear = sideClearForDirection(-1);
 
     if (frontABlocked != frontBBlocked) {
         bool blockedSideIsLeft = frontABlocked == Config::FRONT_A_IS_LEFT;
@@ -705,9 +795,9 @@ int FSM::chooseAvoidDirection() const {
     }
 
     bool leftTooClose = validDistance(distLeft) &&
-                        distLeft < Config::SIDE_CLEAR_MIN_MM;
+                        distLeft < Config::SIDE_GUARD_BLOCK_MM;
     bool rightTooClose = validDistance(distRight) &&
-                         distRight < Config::SIDE_CLEAR_MIN_MM;
+                         distRight < Config::SIDE_GUARD_BLOCK_MM;
 
     if (direction == 1 && leftTooClose && !rightTooClose) {
         direction = -1;

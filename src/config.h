@@ -45,6 +45,11 @@ namespace Config {
     constexpr int   FLC_STRAFE_FAST         = 200;
     constexpr int   FLC_MIN_ESCAPE_STRAFE   = 180;
     constexpr int   FLC_MIN_HOMING_VX       = 140;
+    constexpr float SIDE_GUARD_CAUTION_MM   = 170.0f;
+    constexpr float SIDE_GUARD_BLOCK_MM     = 120.0f;
+    constexpr int   SIDE_GUARD_MAX_CAUTION_VX = FLC_VX_MEDIUM;
+    constexpr int   SIDE_GUARD_MAX_BLOCKED_VX = FLC_VX_CLOSE;
+    constexpr int   SIDE_GUARD_ESCAPE_STRAFE  = FLC_MIN_ESCAPE_STRAFE;
 
     // ── Distances ────────────────────────────────────────────────────────
     constexpr float OBSTACLE_AVOID_MM = 50.0f; // either front IR threshold to trigger avoidance (mm)
