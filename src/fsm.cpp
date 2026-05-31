@@ -41,10 +41,6 @@ namespace {
         return (a < b) ? a : b;
     }
 
-    float maxf(float a, float b)
-    {
-        return (a > b) ? a : b;
-    }
 
     uint8_t fanOutputForDuty(uint8_t duty)
     {
@@ -556,140 +552,6 @@ void FSM::fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference
                    -Config::FLC_TURN_FAST, Config::FLC_TURN_FAST);
 }
 
-char FSM::applySideGuard(int &vx, int &vy, int &wz)
-{
-    unsigned long now = millis();
-
-    if (sideGuardBlockedSide != 0) {
-        bool holdElapsed = (long)(now - sideGuardHoldUntilMs) >= 0;
-        bool releaseClear = false;
-
-        if (sideGuardBlockedSide > 0) {
-            releaseClear = validDistance(distLeft) &&
-                           distLeft >= Config::SIDE_GUARD_RELEASE_MM;
-        } else {
-            releaseClear = validDistance(distRight) &&
-                           distRight >= Config::SIDE_GUARD_RELEASE_MM;
-        }
-
-        if (holdElapsed && releaseClear) {
-            sideGuardBlockedSide = 0;
-        }
-    }
-
-    bool leftCaution = validDistance(distLeft) &&
-                       distLeft <= Config::SIDE_GUARD_CAUTION_MM;
-    bool rightCaution = validDistance(distRight) &&
-                        distRight <= Config::SIDE_GUARD_CAUTION_MM;
-    bool leftBlocked = validDistance(distLeft) &&
-                       distLeft <= Config::SIDE_GUARD_BLOCK_MM;
-    bool rightBlocked = validDistance(distRight) &&
-                        distRight <= Config::SIDE_GUARD_BLOCK_MM;
-
-    bool leftLatched = sideGuardBlockedSide > 0;
-    bool rightLatched = sideGuardBlockedSide < 0;
-    bool leftActive = leftCaution || leftLatched;
-    bool rightActive = rightCaution || rightLatched;
-
-    if (!leftActive && !rightActive) {
-        return '0';
-    }
-
-    bool frontBlocked = obstacleRelevantForApproach(nearestForwardObstacleCm());
-    bool commandIntoLeft = vy > Config::SIDE_GUARD_STRAFE_INTO_MIN ||
-                           wz < -Config::SIDE_GUARD_ARC_WZ_MIN;
-    bool commandIntoRight = vy < -Config::SIDE_GUARD_STRAFE_INTO_MIN ||
-                            wz > Config::SIDE_GUARD_ARC_WZ_MIN;
-
-    if (leftActive && rightActive) {
-        if (frontBlocked) {
-            vx = 0;
-        } else if (vx > Config::SIDE_GUARD_STRAIGHT_MAX_VX) {
-            vx = Config::SIDE_GUARD_STRAIGHT_MAX_VX;
-        }
-        vy = 0;
-        wz = 0;
-        return 'B';
-    }
-
-    if (leftActive) {
-        if (vx > Config::SIDE_GUARD_STRAIGHT_MAX_VX) {
-            vx = Config::SIDE_GUARD_STRAIGHT_MAX_VX;
-        }
-
-        if (commandIntoLeft) {
-            sideGuardBlockedSide = 1;
-            sideGuardHoldUntilMs = now + Config::SIDE_GUARD_HOLD_MS;
-
-            if (leftBlocked) {
-                if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
-                    vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
-                }
-                if (vy > -Config::SIDE_GUARD_ESCAPE_STRAFE) {
-                    vy = -Config::SIDE_GUARD_ESCAPE_STRAFE;
-                }
-            } else if (vy > 0) {
-                vy = 0;
-            }
-
-            if (wz < 0) {
-                wz = 0;
-            }
-            return 'L';
-        }
-
-        if (leftLatched) {
-            if (vy > 0) {
-                vy = 0;
-            }
-            if (wz < 0) {
-                wz = 0;
-            }
-        }
-
-        return 'L';
-    }
-
-    if (rightActive) {
-        if (vx > Config::SIDE_GUARD_STRAIGHT_MAX_VX) {
-            vx = Config::SIDE_GUARD_STRAIGHT_MAX_VX;
-        }
-
-        if (commandIntoRight) {
-            sideGuardBlockedSide = -1;
-            sideGuardHoldUntilMs = now + Config::SIDE_GUARD_HOLD_MS;
-
-            if (rightBlocked) {
-                if (vx > Config::SIDE_GUARD_MAX_BLOCKED_VX) {
-                    vx = Config::SIDE_GUARD_MAX_BLOCKED_VX;
-                }
-                if (vy < Config::SIDE_GUARD_ESCAPE_STRAFE) {
-                    vy = Config::SIDE_GUARD_ESCAPE_STRAFE;
-                }
-            } else if (vy < 0) {
-                vy = 0;
-            }
-
-            if (wz > 0) {
-                wz = 0;
-            }
-            return 'R';
-        }
-
-        if (rightLatched) {
-            if (vy < 0) {
-                vy = 0;
-            }
-            if (wz > 0) {
-                wz = 0;
-            }
-        }
-
-        return 'R';
-    }
-
-    return '0';
-}
 
 void FSM::approachLight()
 {
@@ -760,12 +622,18 @@ void FSM::approachLight()
         if (abs(vy) < Config::FLC_MIN_ESCAPE_STRAFE) {
             vy = selectedAvoidDirection * Config::FLC_MIN_ESCAPE_STRAFE;
         }
+        wz = 0;
     } else if (vx < Config::FLC_MIN_HOMING_VX) {
         vx = Config::FLC_MIN_HOMING_VX;
     }
 
-    if (!blockedWithoutEscape) {
-        guardCode = applySideGuard(vx, vy, wz);
+    bool leftTooClose  = validDistance(distLeft)  && distLeft  < Config::SIDE_STRAFE_TRIGGER_MM;
+    bool rightTooClose = validDistance(distRight) && distRight < Config::SIDE_STRAFE_TRIGGER_MM;
+    if (!blockedWithoutEscape && (leftTooClose || rightTooClose)) {
+        if (leftTooClose)  vy = -Config::SIDE_STRAFE_SPEED;
+        if (rightTooClose) vy =  Config::SIDE_STRAFE_SPEED;
+        wz = 0;
+        guardCode = leftTooClose ? 'L' : 'R';
     }
 
     motors.drive(vx, vy, wz);
@@ -826,11 +694,19 @@ void FSM::fineAlignToLight()
         return;
     }
 
-    if (diff < 0.0f) motors.RotateCW(Config::LIGHT_FINE_ALIGN_SPEED);
-    else             motors.RotateCCW(Config::LIGHT_FINE_ALIGN_SPEED);
-    delay(20);
-    motors.Stop(true);
-    delay(30);
+    // diff < 0 → CW (turns right), diff > 0 → CCW (turns left).
+    // Skip the pulse if rotating that way would swing into a nearby side obstacle.
+    bool rightBlocked = validDistance(distRight) && distRight < Config::SIDE_CLEAR_MIN_MM;
+    bool leftBlocked  = validDistance(distLeft)  && distLeft  < Config::SIDE_CLEAR_MIN_MM;
+    bool wouldHitObstacle = (diff < 0.0f && rightBlocked) || (diff > 0.0f && leftBlocked);
+
+    if (!wouldHitObstacle) {
+        if (diff < 0.0f) motors.RotateCW(Config::LIGHT_FINE_ALIGN_SPEED);
+        else             motors.RotateCCW(Config::LIGHT_FINE_ALIGN_SPEED);
+        delay(20);
+        motors.Stop(true);
+        delay(30);
+    }
 }
 
 void FSM::aligned()
@@ -842,75 +718,48 @@ void FSM::aligned()
         return;
     }
 
-    unsigned long now = millis();
-    float closeRightV = adcToVolts(lightCloseRightRaw);
-    float closeLeftV = adcToVolts(lightCloseLeftRaw);
-    float closeMinV = minf(closeRightV, closeLeftV);
-    float closeRightRise = closeRightV - extinguishBaselineRightV;
-    float closeLeftRise = closeLeftV - extinguishBaselineLeftV;
-    float closeMaxRise = maxf(closeRightRise, closeLeftRise);
+    setFanDuty(Config::FAN_FULL_DUTY);
 
     if (alignedAtMs == 0) {
-        alignedAtMs = now;
+        alignedAtMs = millis();
         lastExtinguishLogMs = 0;
-        extinguishBaselineRightV = closeRightV;
-        extinguishBaselineLeftV = closeLeftV;
-        setFanDuty(Config::FAN_FULL_DUTY);
-
         Serial.print(F("# Fire "));
         Serial.print(lightsFound + 1);
-        Serial.print(F(" aligned. Fan 100%; baseline A4="));
-        Serial.print(extinguishBaselineRightV, 3);
-        Serial.print(F(" A7="));
-        Serial.println(extinguishBaselineLeftV, 3);
-    } else {
-        setFanDuty(Config::FAN_FULL_DUTY);
+        Serial.println(F(" aligned. Fan on. Waiting for A5+A6 > 4V..."));
     }
 
-    closeRightRise = closeRightV - extinguishBaselineRightV;
-    closeLeftRise = closeLeftV - extinguishBaselineLeftV;
-    closeMaxRise = maxf(closeRightRise, closeLeftRise);
-
-    bool voltageSpiked = closeMaxRise >= Config::LIGHT_EXTINGUISHED_SPIKE_V;
-    bool voltageHigh = closeMinV >= Config::LIGHT_EXTINGUISHED_MIN_V;
-    bool extinguished = voltageSpiked || voltageHigh;
-    bool timedOut = (now - alignedAtMs) >= Config::LIGHT_EXTINGUISH_MAX_MS;
+    float longRightV = adcToVolts(lightLongRightRaw);
+    float longLeftV  = adcToVolts(lightLongLeftRaw);
+    unsigned long now = millis();
 
     if (now - lastExtinguishLogMs >= Config::LIGHT_EXTINGUISH_LOG_MS) {
         lastExtinguishLogMs = now;
         Serial.print(F("# extinguish fire="));
         Serial.print(lightsFound + 1);
-        Serial.print(F(" fan=100 A4="));
-        Serial.print(closeRightV, 3);
-        Serial.print(F(" A7="));
-        Serial.print(closeLeftV, 3);
-        Serial.print(F(" min="));
-        Serial.print(closeMinV, 3);
-        Serial.print(F(" riseA4="));
-        Serial.print(closeRightRise, 3);
-        Serial.print(F(" riseA7="));
-        Serial.print(closeLeftRise, 3);
-        Serial.print(F(" maxRise="));
-        Serial.println(closeMaxRise, 3);
+        Serial.print(F(" A5="));
+        Serial.print(longRightV, 3);
+        Serial.print(F(" A6="));
+        Serial.println(longLeftV, 3);
     }
 
-    if (extinguished || timedOut) {
+    if (longRightV > Config::LIGHT_EXTINGUISHED_LONG_V &&
+        longLeftV  > Config::LIGHT_EXTINGUISHED_LONG_V)
+    {
         setFanDuty(0);
         lightsFound++;
-
         Serial.print(F("# Fire "));
         Serial.print(lightsFound);
-        Serial.println(timedOut ? F(" fan timeout; proceeding") : F(" extinguished; fan off"));
+        Serial.println(F(" extinguished (A5+A6 >4V). Fan off."));
 
         if (lightsFound >= Config::FIRES_TO_EXTINGUISH) {
-            Serial.println(F("# Second fire extinguished. Stopping."));
+            Serial.println(F("# All fires extinguished. Stopping."));
             return;
         }
 
         resetLightScan();
         motors.resetHeading();
         motors.latchHeading();
-        Serial.println(F("# Scanning for light 2..."));
+        Serial.println(F("# Scanning for next light..."));
         state = State::SCANNING;
     }
 }
@@ -928,11 +777,11 @@ bool FSM::forwardObstacleDetected() const {
 bool FSM::sideClearForDirection(int direction) const {
     if (direction > 0) {
         return validDistance(distLeft) &&
-               distLeft >= Config::SIDE_GUARD_CAUTION_MM;
+               distLeft >= Config::SIDE_STRAFE_TRIGGER_MM;
     }
     if (direction < 0) {
         return validDistance(distRight) &&
-               distRight >= Config::SIDE_GUARD_CAUTION_MM;
+               distRight >= Config::SIDE_STRAFE_TRIGGER_MM;
     }
     return false;
 }
@@ -973,9 +822,9 @@ int FSM::chooseAvoidDirection() const {
     }
 
     bool leftTooClose = validDistance(distLeft) &&
-                        distLeft < Config::SIDE_GUARD_BLOCK_MM;
+                        distLeft < Config::SIDE_CLEAR_MIN_MM;
     bool rightTooClose = validDistance(distRight) &&
-                         distRight < Config::SIDE_GUARD_BLOCK_MM;
+                         distRight < Config::SIDE_CLEAR_MIN_MM;
 
     if (direction == 1 && leftTooClose && !rightTooClose) {
         direction = -1;

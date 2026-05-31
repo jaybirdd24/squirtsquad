@@ -110,7 +110,6 @@ private:
     int   selectAvoidDirectionForApproach(float obstacleCm);
     void  fuzzyApproach(float fireOffset, float obstacleCm, float sidePreference,
                         int avoidDirection, int &vx, int &vy, int &wz) const;
-    char  applySideGuard(int &vx, int &vy, int &wz);
 
     // ── Avoidance helpers ─────────────────────────────────────────────
     bool forwardObstacleDetected() const;

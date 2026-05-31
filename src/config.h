@@ -31,14 +31,12 @@ namespace Config {
     constexpr int           LIGHT_FINE_ALIGN_SPEED       = 150;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
-    constexpr unsigned long LIGHT_EXTINGUISH_MAX_MS       = 10000;
     constexpr unsigned long LIGHT_EXTINGUISH_LOG_MS       = 250;
-    constexpr float         LIGHT_EXTINGUISHED_SPIKE_V    = 1.0f;
-    constexpr float         LIGHT_EXTINGUISHED_MIN_V      = 3.0f;
+    constexpr float         LIGHT_EXTINGUISHED_LONG_V     = 4.0f; // long-range sensor threshold above which fire is considered extinguished
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
-    constexpr float FLC_DIRECTION_SELECT_CM = 14.0f;
+    constexpr float FLC_DIRECTION_SELECT_CM = 20.0f;
     constexpr float FLC_AVOID_RELEASE_CM    = 32.0f;
     constexpr float FLC_SIDE_BIAS           = 180.0f;
     constexpr float FLC_SIDE_FULL_LEFT_MM   = 650.0f;
@@ -54,22 +52,14 @@ namespace Config {
     constexpr int   FLC_STRAFE_FAST         = 200;
     constexpr int   FLC_MIN_ESCAPE_STRAFE   = 180;
     constexpr int   FLC_MIN_HOMING_VX       = 140;
-    constexpr float SIDE_GUARD_CAUTION_MM   = 170.0f;
-    constexpr float SIDE_GUARD_BLOCK_MM     = 120.0f;
-    constexpr int   SIDE_GUARD_MAX_CAUTION_VX = FLC_VX_MEDIUM;
-    constexpr int   SIDE_GUARD_MAX_BLOCKED_VX = FLC_VX_CLOSE;
-    constexpr int   SIDE_GUARD_ESCAPE_STRAFE  = FLC_MIN_ESCAPE_STRAFE;
-    constexpr int   SIDE_GUARD_STRAFE_INTO_MIN = 30;
-    constexpr int   SIDE_GUARD_ARC_WZ_MIN      = FLC_TURN_SLOW;
-    constexpr int   SIDE_GUARD_STRAIGHT_MAX_VX = FLC_VX_MEDIUM;
-    constexpr float SIDE_GUARD_RELEASE_MM      = 190.0f;
-    constexpr unsigned long SIDE_GUARD_HOLD_MS = 600;
+    constexpr float SIDE_STRAFE_TRIGGER_MM = 150.0f; // strafe away from side obstacle below this distance
+    constexpr int   SIDE_STRAFE_SPEED      = FLC_STRAFE_FAST;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 72.0f; // either front IR threshold to trigger avoidance (mm)
-    constexpr float OBSTACLE_SONAR_CM = 6.0f;  // sonar threshold to trigger avoidance (cm)
-    constexpr float OBSTACLE_CLEAR_MM = 120.0f; // front-left/front-right IR must rise above this to count as clear
-    constexpr float OBSTACLE_SONAR_CLEAR_CM = 26.0f; // sonar must rise above this to count as clear
+    constexpr float OBSTACLE_AVOID_MM = 100.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_SONAR_CM = 10.0f;  // sonar threshold to trigger avoidance (cm)
+    constexpr float OBSTACLE_CLEAR_MM = 150.0f; // front-left/front-right IR must rise above this to count as clear
+    constexpr float OBSTACLE_SONAR_CLEAR_CM = 30.0f; // sonar must rise above this to count as clear
     constexpr float SIDE_CLEAR_MIN_MM = 50.0f; // side gap preferred before strafing toward that side
     constexpr float SIDE_CLEAR_MARGIN_MM = 50.0f; // side-gap difference to override direction
 
