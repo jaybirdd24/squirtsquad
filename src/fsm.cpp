@@ -105,6 +105,15 @@ namespace {
                       (fullClearMm - Config::SIDE_CLEAR_MIN_MM);
         return constrain(score, 0.0f, 1.0f);
     }
+
+    float cappedSideClearance(float distanceMm)
+    {
+        if (!validDistance(distanceMm)) {
+            return -1.0f;
+        }
+
+        return constrain(distanceMm, 0.0f, Config::SIDE_OPEN_COMPARE_CAP_MM);
+    }
 }
 
 FSM::FSM()
@@ -410,11 +419,6 @@ bool FSM::obstacleRelevantForApproach(float obstacleCm) const
 
 int FSM::selectAvoidDirectionForApproach(float obstacleCm)
 {
-    bool frontABlocked = validDistance(distFrontA) &&
-                         distFrontA <= Config::OBSTACLE_AVOID_MM;
-    bool frontBBlocked = validDistance(distFrontB) &&
-                         distFrontB <= Config::OBSTACLE_AVOID_MM;
-    bool oneFrontSensorBlocked = frontABlocked != frontBBlocked;
     bool obstacleRelevant = obstacleRelevantForApproach(obstacleCm);
 
     if (!obstacleRelevant) {
@@ -424,13 +428,22 @@ int FSM::selectAvoidDirectionForApproach(float obstacleCm)
         return 0;
     }
 
-    bool canReuseDirection = !oneFrontSensorBlocked &&
-                             avoidDirection != 0 &&
-                             sideClearForDirection(avoidDirection);
-    if (!canReuseDirection) {
-        avoidDirection = chooseAvoidDirection();
+    if (avoidDirection != 0) {
+        bool latchedSideSafe = sideClearForDirection(avoidDirection);
+        bool oppositeSideSafe = sideClearForDirection(-avoidDirection);
+        float latchedClearance = cappedSideClearance(avoidDirection > 0 ? distLeft : distRight);
+        float oppositeClearance = cappedSideClearance(avoidDirection > 0 ? distRight : distLeft);
+        bool oppositeMeaningfullyBetter =
+            oppositeSideSafe &&
+            (!latchedSideSafe ||
+             oppositeClearance >= latchedClearance + Config::SIDE_OPEN_SWITCH_MARGIN_MM);
+
+        if (latchedSideSafe && !oppositeMeaningfullyBetter) {
+            return avoidDirection;
+        }
     }
 
+    avoidDirection = chooseAvoidDirection();
     return avoidDirection;
 }
 
@@ -777,11 +790,11 @@ bool FSM::forwardObstacleDetected() const {
 bool FSM::sideClearForDirection(int direction) const {
     if (direction > 0) {
         return validDistance(distLeft) &&
-               distLeft >= Config::SIDE_STRAFE_TRIGGER_MM;
+               distLeft >= Config::SIDE_ESCAPE_MIN_MM;
     }
     if (direction < 0) {
         return validDistance(distRight) &&
-               distRight >= Config::SIDE_STRAFE_TRIGGER_MM;
+               distRight >= Config::SIDE_ESCAPE_MIN_MM;
     }
     return false;
 }
@@ -792,10 +805,10 @@ int FSM::chooseAvoidDirection() const {
     bool frontBBlocked = validDistance(distFrontB) &&
                          distFrontB <= Config::OBSTACLE_AVOID_MM;
 
-    int direction = -1;
-
-    bool leftClear = sideClearForDirection(1);
-    bool rightClear = sideClearForDirection(-1);
+    bool leftSafe = sideClearForDirection(1);
+    bool rightSafe = sideClearForDirection(-1);
+    float leftClearance = cappedSideClearance(distLeft);
+    float rightClearance = cappedSideClearance(distRight);
 
     if (frontABlocked != frontBBlocked) {
         bool blockedSideIsLeft = frontABlocked == Config::FRONT_A_IS_LEFT;
@@ -807,32 +820,18 @@ int FSM::chooseAvoidDirection() const {
         return 0;
     }
 
-    if (leftClear && !rightClear) return 1;
-    if (rightClear && !leftClear) return -1;
-    if (!leftClear && !rightClear) return 0;
+    if (leftSafe && !rightSafe) return 1;
+    if (rightSafe && !leftSafe) return -1;
+    if (!leftSafe && !rightSafe) return 0;
 
-    if (frontABlocked && frontBBlocked) {
-        direction = (distLeft >= distRight) ? 1 : -1;
-    } else if (validDistance(distLeft) && validDistance(distRight)) {
-        if (distLeft > distRight + Config::SIDE_CLEAR_MARGIN_MM) {
-            direction = 1;
-        } else if (distRight > distLeft + Config::SIDE_CLEAR_MARGIN_MM) {
-            direction = -1;
-        }
+    if (leftClearance >= rightClearance + Config::SIDE_OPEN_SWITCH_MARGIN_MM) {
+        return 1;
+    }
+    if (rightClearance >= leftClearance + Config::SIDE_OPEN_SWITCH_MARGIN_MM) {
+        return -1;
     }
 
-    bool leftTooClose = validDistance(distLeft) &&
-                        distLeft < Config::SIDE_CLEAR_MIN_MM;
-    bool rightTooClose = validDistance(distRight) &&
-                         distRight < Config::SIDE_CLEAR_MIN_MM;
-
-    if (direction == 1 && leftTooClose && !rightTooClose) {
-        direction = -1;
-    } else if (direction == -1 && rightTooClose && !leftTooClose) {
-        direction = 1;
-    }
-
-    return direction;
+    return (leftClearance >= rightClearance) ? 1 : -1;
 }
 
 void FSM::sendTelemetry() {

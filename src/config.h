@@ -56,12 +56,15 @@ namespace Config {
     constexpr int   SIDE_STRAFE_SPEED      = FLC_STRAFE_FAST;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 100.0f; // either front IR threshold to trigger avoidance (mm)
-    constexpr float OBSTACLE_SONAR_CM = 10.0f;  // sonar threshold to trigger avoidance (cm)
-    constexpr float OBSTACLE_CLEAR_MM = 150.0f; // front-left/front-right IR must rise above this to count as clear
+    constexpr float OBSTACLE_AVOID_MM = 110.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_SONAR_CM = 11.0f;  // sonar threshold to trigger avoidance (cm)
+    constexpr float OBSTACLE_CLEAR_MM = 165.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 30.0f; // sonar must rise above this to count as clear
-    constexpr float SIDE_CLEAR_MIN_MM = 50.0f; // side gap preferred before strafing toward that side
-    constexpr float SIDE_CLEAR_MARGIN_MM = 50.0f; // side-gap difference to override direction
+    constexpr float SIDE_CLEAR_MIN_MM = 55.0f; // side gap preferred before strafing toward that side
+    constexpr float SIDE_CLEAR_MARGIN_MM = 55.0f; // side-gap difference to override direction
+    constexpr float SIDE_OPEN_COMPARE_CAP_MM = 300.0f; // cap side comparison to the shorter side sensor range
+    constexpr float SIDE_OPEN_SWITCH_MARGIN_MM = 50.0f; // clearance advantage needed before switching escape side
+    constexpr float SIDE_ESCAPE_MIN_MM = 50.0f; // absolute minimum side gap for an escape strafe
 
     // ── Speeds (0–1000) ──────────────────────────────────────────────────
     constexpr int SPEED_DRIVE  = 200; // forward speed during the isolation test
