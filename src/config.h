@@ -89,6 +89,21 @@ namespace Config {
     constexpr unsigned int OBSTACLE_CLEAR_TICKS   = 6; // consecutive clear ticks before driving forward again
     constexpr unsigned long AVOID_DIRECTION_STICKY_MS = 1000; // reuse direction if obstacle reappears soon
 
+    // Reverse escape — triggered when front is blocked and neither side is clear
+    constexpr int            REVERSE_ESCAPE_SPEED   = 120;   // backward speed during escape
+    constexpr unsigned long  REVERSE_ESCAPE_MS      = 600;   // base reverse duration
+    constexpr unsigned long  REVERSE_ESCAPE_LONG_MS = 1200;  // extended duration when oscillating
+
+    // Obstacle memory / anti-oscillation
+    constexpr int            OSCILLATION_TRIGGER_COUNT = 3;    // hits within window before extended escape + direction flip
+    constexpr unsigned long  OSCILLATION_WINDOW_MS    = 5000;  // rolling window for counting hits
+
+    // Blind-spot coverage
+    // When a front-left or front-right sensor fires within this distance, immediately
+    // trigger the side strafe guard — no side sensor required. Wider than OBSTACLE_AVOID_MM
+    // so the robot reacts before it's already on top of the obstacle.
+    constexpr float BLIND_SPOT_WARN_MM = 150.0f;
+
     // ── Pins ─────────────────────────────────────────────────────────────
     constexpr uint8_t PIN_MOTOR_LF = 46; // left-front motor PWM servo pin
     constexpr uint8_t PIN_MOTOR_LR = 47; // left-rear motor PWM servo pin

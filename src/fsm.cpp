@@ -143,6 +143,9 @@ FSM::FSM()
       avoidSuppressUntilMs(0),
       sideGuardBlockedSide(0),
       sideGuardHoldUntilMs(0),
+      reverseEscapeUntilMs(0),
+      recentObstacleHits(0),
+      lastObstacleHitMs(0),
       lightsFound(0),
       alignedAtMs(0),
       lastExtinguishLogMs(0),
@@ -185,6 +188,7 @@ void FSM::fsmUpdate() {
         case State::APPROACH_LIGHT: approachLight();       break;
         case State::FINE_ALIGN:     fineAlignToLight();    break;
         case State::ALIGNED:        aligned();             break;
+        case State::REVERSE_ESCAPE: reverseEscape();       break;
     }
 
     sendTelemetry();
@@ -242,6 +246,9 @@ void FSM::resetLightScan()
     avoidSuppressUntilMs = 0;
     sideGuardBlockedSide = 0;
     sideGuardHoldUntilMs = 0;
+    reverseEscapeUntilMs = 0;
+    recentObstacleHits = 0;
+    lastObstacleHitMs = 0;
     alignedAtMs = 0;
     lastExtinguishLogMs = 0;
     extinguishBaselineRightV = 5.0f;
@@ -627,10 +634,9 @@ void FSM::approachLight()
 
     char guardCode = '0';
     if (blockedWithoutEscape) {
-        vx = 0;
-        vy = 0;
-        wz = 0;
-        guardCode = 'B';
+        recordObstacleHit();
+        enterReverseEscape();
+        return;
     } else if (avoidingObstacle) {
         if (abs(vy) < Config::FLC_MIN_ESCAPE_STRAFE) {
             vy = selectedAvoidDirection * Config::FLC_MIN_ESCAPE_STRAFE;
@@ -642,11 +648,31 @@ void FSM::approachLight()
 
     bool leftTooClose  = validDistance(distLeft)  && distLeft  < Config::SIDE_STRAFE_TRIGGER_MM;
     bool rightTooClose = validDistance(distRight) && distRight < Config::SIDE_STRAFE_TRIGGER_MM;
-    if (!blockedWithoutEscape && (leftTooClose || rightTooClose)) {
-        if (leftTooClose)  vy = -Config::SIDE_STRAFE_SPEED;
-        if (rightTooClose) vy =  Config::SIDE_STRAFE_SPEED;
+
+    // Blind-spot coverage: distFrontA faces the front-left corner, distFrontB the front-right.
+    // If either fires within the wider warning zone, immediately trigger the side strafe —
+    // no side sensor confirmation needed. Suppressed when close to the light so the robot
+    // doesn't react to the fire pedestal itself.
+    if (!closeToLight) {
+        if (validDistance(distFrontA) && distFrontA < Config::BLIND_SPOT_WARN_MM)
+            leftTooClose  = true;
+        if (validDistance(distFrontB) && distFrontB < Config::BLIND_SPOT_WARN_MM)
+            rightTooClose = true;
+    }
+
+    if (leftTooClose || rightTooClose) {
+        if (leftTooClose && rightTooClose) {
+            // Corridor: both sides close — don't push into either wall, let vx carry through
+            vy = 0;
+            guardCode = 'C';
+        } else if (leftTooClose) {
+            vy = -Config::SIDE_STRAFE_SPEED;
+            guardCode = 'L';
+        } else {
+            vy = Config::SIDE_STRAFE_SPEED;
+            guardCode = 'R';
+        }
         wz = 0;
-        guardCode = leftTooClose ? 'L' : 'R';
     }
 
     motors.drive(vx, vy, wz);
@@ -832,6 +858,63 @@ int FSM::chooseAvoidDirection() const {
     }
 
     return (leftClearance >= rightClearance) ? 1 : -1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reverse escape
+// ─────────────────────────────────────────────────────────────────────────────
+
+void FSM::recordObstacleHit()
+{
+    unsigned long now = millis();
+    // lastObstacleHitMs == 0 means no previous hit has been recorded yet
+    if (lastObstacleHitMs != 0 && now - lastObstacleHitMs < Config::OSCILLATION_WINDOW_MS) {
+        recentObstacleHits++;
+    } else {
+        recentObstacleHits = 1;
+    }
+    lastObstacleHitMs = now;
+}
+
+void FSM::enterReverseEscape()
+{
+    bool oscillating = recentObstacleHits >= Config::OSCILLATION_TRIGGER_COUNT;
+
+    unsigned long duration = oscillating ? Config::REVERSE_ESCAPE_LONG_MS
+                                         : Config::REVERSE_ESCAPE_MS;
+    reverseEscapeUntilMs = millis() + duration;
+
+    // Oscillating: we've hit an obstacle from the same direction repeatedly.
+    // Flip the latched avoid direction so we try the other side on the next approach.
+    if (oscillating && avoidDirection != 0) {
+        avoidDirection = -avoidDirection;
+    }
+
+    motors.Stop(true);
+    motors.latchHeading();
+    state = State::REVERSE_ESCAPE;
+
+    Serial.print(F("# REVERSE_ESCAPE hits="));
+    Serial.print(recentObstacleHits);
+    Serial.print(F(" dur="));
+    Serial.print(duration);
+    Serial.println(oscillating ? F("ms [oscillating, dir flipped]") : F("ms"));
+}
+
+void FSM::reverseEscape()
+{
+    // Drive straight backward, heading correction keeps us from spinning.
+    // Speed is intentionally conservative — we have no rear sensor.
+    int wz = (int)motors.headingCorrection();
+    motors.drive(-Config::REVERSE_ESCAPE_SPEED, 0, wz);
+
+    if (millis() >= reverseEscapeUntilMs) {
+        motors.Stop(true);
+        motors.latchHeading();
+        avoidDirection = 0;  // let selectAvoidDirection pick fresh on the next approach
+        state = State::APPROACH_LIGHT;
+        Serial.println(F("# Reverse escape done, resuming approach"));
+    }
 }
 
 void FSM::sendTelemetry() {
