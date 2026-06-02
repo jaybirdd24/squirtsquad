@@ -31,14 +31,12 @@ namespace Config {
     constexpr int           LIGHT_FINE_ALIGN_SPEED       = 150;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
-    constexpr unsigned long LIGHT_EXTINGUISH_MAX_MS       = 10000;
     constexpr unsigned long LIGHT_EXTINGUISH_LOG_MS       = 250;
-    constexpr float         LIGHT_EXTINGUISHED_SPIKE_V    = 1.0f;
-    constexpr float         LIGHT_EXTINGUISHED_MIN_V      = 3.0f;
+    constexpr float         LIGHT_EXTINGUISHED_LONG_V     = 4.0f; // long-range sensor threshold above which fire is considered extinguished
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
-    constexpr float FLC_DIRECTION_SELECT_CM = 14.0f;
+    constexpr float FLC_DIRECTION_SELECT_CM = 20.0f;
     constexpr float FLC_AVOID_RELEASE_CM    = 32.0f;
     constexpr float FLC_SIDE_BIAS           = 180.0f;
     constexpr float FLC_SIDE_FULL_LEFT_MM   = 650.0f;
@@ -54,24 +52,19 @@ namespace Config {
     constexpr int   FLC_STRAFE_FAST         = 200;
     constexpr int   FLC_MIN_ESCAPE_STRAFE   = 180;
     constexpr int   FLC_MIN_HOMING_VX       = 140;
-    constexpr float SIDE_GUARD_CAUTION_MM   = 170.0f;
-    constexpr float SIDE_GUARD_BLOCK_MM     = 120.0f;
-    constexpr int   SIDE_GUARD_MAX_CAUTION_VX = FLC_VX_MEDIUM;
-    constexpr int   SIDE_GUARD_MAX_BLOCKED_VX = FLC_VX_CLOSE;
-    constexpr int   SIDE_GUARD_ESCAPE_STRAFE  = FLC_MIN_ESCAPE_STRAFE;
-    constexpr int   SIDE_GUARD_STRAFE_INTO_MIN = 30;
-    constexpr int   SIDE_GUARD_ARC_WZ_MIN      = FLC_TURN_SLOW;
-    constexpr int   SIDE_GUARD_STRAIGHT_MAX_VX = FLC_VX_MEDIUM;
-    constexpr float SIDE_GUARD_RELEASE_MM      = 190.0f;
-    constexpr unsigned long SIDE_GUARD_HOLD_MS = 600;
+    constexpr float SIDE_STRAFE_TRIGGER_MM = 150.0f; // strafe away from side obstacle below this distance
+    constexpr int   SIDE_STRAFE_SPEED      = FLC_STRAFE_FAST;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 72.0f; // either front IR threshold to trigger avoidance (mm)
-    constexpr float OBSTACLE_SONAR_CM = 6.0f;  // sonar threshold to trigger avoidance (cm)
-    constexpr float OBSTACLE_CLEAR_MM = 120.0f; // front-left/front-right IR must rise above this to count as clear
-    constexpr float OBSTACLE_SONAR_CLEAR_CM = 26.0f; // sonar must rise above this to count as clear
-    constexpr float SIDE_CLEAR_MIN_MM = 50.0f; // side gap preferred before strafing toward that side
-    constexpr float SIDE_CLEAR_MARGIN_MM = 50.0f; // side-gap difference to override direction
+    constexpr float OBSTACLE_AVOID_MM = 110.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_SONAR_CM = 11.0f;  // sonar threshold to trigger avoidance (cm)
+    constexpr float OBSTACLE_CLEAR_MM = 165.0f; // front-left/front-right IR must rise above this to count as clear
+    constexpr float OBSTACLE_SONAR_CLEAR_CM = 30.0f; // sonar must rise above this to count as clear
+    constexpr float SIDE_CLEAR_MIN_MM = 55.0f; // side gap preferred before strafing toward that side
+    constexpr float SIDE_CLEAR_MARGIN_MM = 55.0f; // side-gap difference to override direction
+    constexpr float SIDE_OPEN_COMPARE_CAP_MM = 300.0f; // cap side comparison to the shorter side sensor range
+    constexpr float SIDE_OPEN_SWITCH_MARGIN_MM = 50.0f; // clearance advantage needed before switching escape side
+    constexpr float SIDE_ESCAPE_MIN_MM = 50.0f; // absolute minimum side gap for an escape strafe
 
     // ── Speeds (0–1000) ──────────────────────────────────────────────────
     constexpr int SPEED_DRIVE  = 200; // forward speed during the isolation test
@@ -95,6 +88,23 @@ namespace Config {
     constexpr unsigned int OBSTACLE_CONFIRM_TICKS = 3; // consecutive blocked ticks before avoiding
     constexpr unsigned int OBSTACLE_CLEAR_TICKS   = 6; // consecutive clear ticks before driving forward again
     constexpr unsigned long AVOID_DIRECTION_STICKY_MS = 1000; // reuse direction if obstacle reappears soon
+
+    // Reverse escape — triggered when front is blocked and neither side is clear
+    constexpr int            REVERSE_ESCAPE_SPEED   = 120;   // backward speed during escape
+    constexpr unsigned long  REVERSE_ESCAPE_MS      = 600;   // base reverse duration
+    constexpr unsigned long  REVERSE_ESCAPE_LONG_MS = 1200;  // extended duration when oscillating
+
+    // Obstacle memory / anti-oscillation
+    constexpr int            OSCILLATION_TRIGGER_COUNT = 3;    // hits within window before extended escape + direction flip
+    constexpr unsigned long  OSCILLATION_WINDOW_MS    = 5000;  // rolling window for counting hits
+
+    // Blind-spot coverage
+    // The diagonal front sensors see an obstacle just before it enters the blind spot gap.
+    // BLIND_SPOT_WARN_MM: detection distance that refreshes the latch.
+    // BLIND_SPOT_LATCH_MS: how long to keep the side strafe active after the sensor loses
+    //                      sight of it (carries avoidance through the blind spot transition).
+    constexpr float          BLIND_SPOT_WARN_MM  = 150.0f;
+    constexpr unsigned long  BLIND_SPOT_LATCH_MS = 600;
 
     // ── Pins ─────────────────────────────────────────────────────────────
     constexpr uint8_t PIN_MOTOR_LF = 46; // left-front motor PWM servo pin
