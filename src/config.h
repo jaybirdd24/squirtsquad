@@ -12,7 +12,7 @@ namespace Config {
 
     constexpr uint8_t PIN_FAN = 5;
     constexpr bool    FAN_ACTIVE_HIGH = true;
-    constexpr uint8_t FAN_FULL_DUTY = 255;
+    constexpr uint8_t FAN_FULL_DUTY = 2;
 
     // Set true only for bench testing when the robot is already facing the light.
     constexpr bool LIGHT_DIRECT_APPROACH_TEST_MODE = false;
@@ -24,10 +24,11 @@ namespace Config {
     constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
     constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
     constexpr float         LIGHT_STOP_VOLTAGE_V         = 1.0f;
-    constexpr float         LIGHT_AVOID_DISABLE_V        = 1.0f;
+    constexpr float         LIGHT_AVOID_DISABLE_V        = 3.0f;
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
-    constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V = 0.25f;
+    constexpr float         LIGHT_LONG_SUPPRESS_V        = 3.0f;  // long-range sensor threshold below which the obstacle ahead is assumed to be the pillar — disables forward obstacle avoidance
+    constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V = 0.4f;
     constexpr int           LIGHT_FINE_ALIGN_SPEED       = 150;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
@@ -56,7 +57,7 @@ namespace Config {
     constexpr int   SIDE_STRAFE_SPEED      = FLC_STRAFE_FAST;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 110.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_AVOID_MM = 130.0f; // either front IR threshold to trigger avoidance (mm)
     constexpr float OBSTACLE_SONAR_CM = 11.0f;  // sonar threshold to trigger avoidance (cm)
     constexpr float OBSTACLE_CLEAR_MM = 165.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 30.0f; // sonar must rise above this to count as clear
