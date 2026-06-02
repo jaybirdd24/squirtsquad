@@ -75,6 +75,10 @@ private:
     int           sideGuardBlockedSide;  // +1 = left latched, -1 = right latched
     unsigned long sideGuardHoldUntilMs;  // minimum hold time for side guard latch
 
+    // ── Blind-spot latches ────────────────────────────────────────────
+    unsigned long blindSpotLeftUntilMs;   // keep left side guard active until this time
+    unsigned long blindSpotRightUntilMs;  // keep right side guard active until this time
+
     // ── Reverse escape ────────────────────────────────────────────────
     unsigned long reverseEscapeUntilMs;  // keep reversing until this timestamp
 

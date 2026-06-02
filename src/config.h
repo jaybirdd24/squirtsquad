@@ -99,10 +99,12 @@ namespace Config {
     constexpr unsigned long  OSCILLATION_WINDOW_MS    = 5000;  // rolling window for counting hits
 
     // Blind-spot coverage
-    // When a front-left or front-right sensor fires within this distance, immediately
-    // trigger the side strafe guard — no side sensor required. Wider than OBSTACLE_AVOID_MM
-    // so the robot reacts before it's already on top of the obstacle.
-    constexpr float BLIND_SPOT_WARN_MM = 150.0f;
+    // The diagonal front sensors see an obstacle just before it enters the blind spot gap.
+    // BLIND_SPOT_WARN_MM: detection distance that refreshes the latch.
+    // BLIND_SPOT_LATCH_MS: how long to keep the side strafe active after the sensor loses
+    //                      sight of it (carries avoidance through the blind spot transition).
+    constexpr float          BLIND_SPOT_WARN_MM  = 150.0f;
+    constexpr unsigned long  BLIND_SPOT_LATCH_MS = 600;
 
     // ── Pins ─────────────────────────────────────────────────────────────
     constexpr uint8_t PIN_MOTOR_LF = 46; // left-front motor PWM servo pin

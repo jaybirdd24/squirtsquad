@@ -143,6 +143,8 @@ FSM::FSM()
       avoidSuppressUntilMs(0),
       sideGuardBlockedSide(0),
       sideGuardHoldUntilMs(0),
+      blindSpotLeftUntilMs(0),
+      blindSpotRightUntilMs(0),
       reverseEscapeUntilMs(0),
       recentObstacleHits(0),
       lastObstacleHitMs(0),
@@ -246,6 +248,8 @@ void FSM::resetLightScan()
     avoidSuppressUntilMs = 0;
     sideGuardBlockedSide = 0;
     sideGuardHoldUntilMs = 0;
+    blindSpotLeftUntilMs = 0;
+    blindSpotRightUntilMs = 0;
     reverseEscapeUntilMs = 0;
     recentObstacleHits = 0;
     lastObstacleHitMs = 0;
@@ -641,7 +645,7 @@ void FSM::approachLight()
         if (abs(vy) < Config::FLC_MIN_ESCAPE_STRAFE) {
             vy = selectedAvoidDirection * Config::FLC_MIN_ESCAPE_STRAFE;
         }
-        wz = 0;
+        // wz left as fuzzy output so robot keeps facing the light while strafing
     } else if (vx < Config::FLC_MIN_HOMING_VX) {
         vx = Config::FLC_MIN_HOMING_VX;
     }
@@ -649,21 +653,28 @@ void FSM::approachLight()
     bool leftTooClose  = validDistance(distLeft)  && distLeft  < Config::SIDE_STRAFE_TRIGGER_MM;
     bool rightTooClose = validDistance(distRight) && distRight < Config::SIDE_STRAFE_TRIGGER_MM;
 
-    // Blind-spot coverage: distFrontA faces the front-left corner, distFrontB the front-right.
-    // If either fires within the wider warning zone, immediately trigger the side strafe —
-    // no side sensor confirmation needed. Suppressed when close to the light so the robot
-    // doesn't react to the fire pedestal itself.
+    // Blind-spot latch: the diagonal front sensors see an obstacle just before it enters
+    // the gap between them and the side sensors. Each time a sensor sees something within
+    // BLIND_SPOT_WARN_MM, the latch is refreshed. The latch stays active for
+    // BLIND_SPOT_LATCH_MS after the sensor last saw it, bridging the transition into the
+    // blind spot. Suppressed when close to the light to avoid reacting to the fire pedestal.
     if (!closeToLight) {
         if (validDistance(distFrontA) && distFrontA < Config::BLIND_SPOT_WARN_MM)
-            leftTooClose  = true;
+            blindSpotLeftUntilMs  = now2 + Config::BLIND_SPOT_LATCH_MS;
         if (validDistance(distFrontB) && distFrontB < Config::BLIND_SPOT_WARN_MM)
-            rightTooClose = true;
+            blindSpotRightUntilMs = now2 + Config::BLIND_SPOT_LATCH_MS;
     }
+    if (now2 < blindSpotLeftUntilMs)  leftTooClose  = true;
+    if (now2 < blindSpotRightUntilMs) rightTooClose = true;
 
     if (leftTooClose || rightTooClose) {
         if (leftTooClose && rightTooClose) {
-            // Corridor: both sides close — don't push into either wall, let vx carry through
-            vy = 0;
+            // Both sides triggered — if avoidance has a direction, use it rather than
+            // zeroing vy and stalling. selectedAvoidDirection reflects which side has
+            // more room so it's the best escape vector available.
+            vy = (selectedAvoidDirection != 0)
+                     ? selectedAvoidDirection * Config::SIDE_STRAFE_SPEED
+                     : 0;
             guardCode = 'C';
         } else if (leftTooClose) {
             vy = -Config::SIDE_STRAFE_SPEED;
@@ -672,7 +683,7 @@ void FSM::approachLight()
             vy = Config::SIDE_STRAFE_SPEED;
             guardCode = 'R';
         }
-        wz = 0;
+        // wz left as fuzzy output so robot keeps facing the light while strafing
     }
 
     motors.drive(vx, vy, wz);
@@ -848,16 +859,17 @@ int FSM::chooseAvoidDirection() const {
 
     if (leftSafe && !rightSafe) return 1;
     if (rightSafe && !leftSafe) return -1;
-    if (!leftSafe && !rightSafe) return 0;
 
-    if (leftClearance >= rightClearance + Config::SIDE_OPEN_SWITCH_MARGIN_MM) {
-        return 1;
-    }
-    if (rightClearance >= leftClearance + Config::SIDE_OPEN_SWITCH_MARGIN_MM) {
-        return -1;
+    // Both safe OR both below minimum — always pick the more open side using raw
+    // distances rather than stopping. If one side is genuinely more open, go there.
+    if (validDistance(distLeft) && validDistance(distRight)) {
+        return (distLeft >= distRight) ? 1 : -1;
     }
 
-    return (leftClearance >= rightClearance) ? 1 : -1;
+    // One or both sensors invalid — fall back to whichever side is known safe
+    if (leftSafe)  return 1;
+    if (rightSafe) return -1;
+    return 0;  // truly no information on either side
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
