@@ -187,6 +187,7 @@ void FSM::fsmUpdate() {
         case State::SCANNING:       scanForLight();        break;
         case State::ANALYZING:      analyzeLightScan();    break;
         case State::COARSE_ALIGN:   coarseAlignToLight();  break;
+        case State::SENSOR_ALIGN:   sensorAlignToLight(); break;
         case State::APPROACH_LIGHT: approachLight();       break;
         case State::FINE_ALIGN:     fineAlignToLight();    break;
         case State::ALIGNED:        aligned();             break;
@@ -330,9 +331,15 @@ float FSM::analyzeScans()
     }
 
     float result;
-    if (foundRight && foundLeft) result = (bestRightHeading + bestLeftHeading) * 0.5f;
-    else if (foundRight)         result = bestRightHeading;
-    else                         result = bestLeftHeading;
+    if (foundRight && foundLeft) {
+        // circular mean: step halfway along the shorter arc from left to right
+        float diff = normalizeAngle(bestRightHeading - bestLeftHeading);
+        result = bestLeftHeading + diff * 0.5f;
+    } else if (foundRight) {
+        result = bestRightHeading;
+    } else {
+        result = bestLeftHeading;
+    }
 
     Serial.print(F("# A5 peak: ")); Serial.print(bestRightHeading, 1);
     Serial.print(F(" deg  A6 peak: ")); Serial.print(bestLeftHeading, 1);
@@ -382,16 +389,47 @@ void FSM::coarseAlignToLight()
                                 : F("# Coarse aligned. Approaching..."));
         lastLightLogMs = 0;
         avoidDirection = 0;
+        coarseAlignStartMs = 0;
+        state = State::SENSOR_ALIGN;
+        return;
+    }
+
+    float absError = fabsf(error);
+    int speed;
+    if      (absError > 45.0f) speed = Config::LIGHT_SCAN_SPIN_SPEED;
+    else if (absError > 10.0f) speed = Config::LIGHT_FINE_ALIGN_SPEED + 70;
+    else                       speed = Config::LIGHT_FINE_ALIGN_SPEED;
+
+    if (error > 0.0f) motors.RotateCCW(speed);
+    else              motors.RotateCW(speed);
+}
+
+void FSM::sensorAlignToLight()
+{
+    if (coarseAlignStartMs == 0) {
+        coarseAlignStartMs = millis();
+        Serial.println(F("# Sensor aligning to light..."));
+    }
+
+    float longRightV = adcToVolts(lightLongRightRaw);
+    float longLeftV  = adcToVolts(lightLongLeftRaw);
+
+    bool aligned   = longRightV <= Config::LIGHT_SENSOR_ALIGN_V ||
+                     longLeftV  <= Config::LIGHT_SENSOR_ALIGN_V;
+    bool timedOut  = (millis() - coarseAlignStartMs) > Config::LIGHT_SENSOR_ALIGN_TIMEOUT_MS;
+
+    if (aligned || timedOut) {
+        motors.Stop(true);
+        Serial.println(timedOut ? F("# Sensor align timeout; approaching")
+                                : F("# Sensor aligned. Approaching..."));
         state = State::APPROACH_LIGHT;
         return;
     }
 
-    int speed = (fabsf(error) > 20.0f)
-              ? Config::LIGHT_SCAN_SPIN_SPEED
-              : Config::LIGHT_FINE_ALIGN_SPEED + 170;
-
-    if (error > 0.0f) motors.RotateCCW(speed);
-    else              motors.RotateCW(speed);
+    // diff > 0: leftV > rightV → right has more light (lower V = brighter) → rotate CW toward it
+    float diff = longLeftV - longRightV;
+    if (diff > 0.0f) motors.RotateCW(Config::LIGHT_SENSOR_ALIGN_SPEED);
+    else             motors.RotateCCW(Config::LIGHT_SENSOR_ALIGN_SPEED);
 }
 
 float FSM::nearestForwardObstacleCm() const

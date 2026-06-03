@@ -28,8 +28,11 @@ namespace Config {
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
     constexpr float         LIGHT_LONG_SUPPRESS_V        = 3.0f;  // long-range sensor threshold below which the obstacle ahead is assumed to be the pillar — disables forward obstacle avoidance
-    constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V = 0.4f;
-    constexpr int           LIGHT_FINE_ALIGN_SPEED       = 150;
+    constexpr float         LIGHT_SENSOR_ALIGN_V          = 0.4f;
+    constexpr unsigned long LIGHT_SENSOR_ALIGN_TIMEOUT_MS = 5000;
+    constexpr int           LIGHT_SENSOR_ALIGN_SPEED      = 80;
+    constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V  = 0.6f;
+    constexpr int           LIGHT_FINE_ALIGN_SPEED        = 150;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
     constexpr unsigned long LIGHT_EXTINGUISH_LOG_MS       = 250;
@@ -62,7 +65,7 @@ namespace Config {
 
     // ── Distances ────────────────────────────────────────────────────────
     constexpr float OBSTACLE_AVOID_MM = 140.0f; // either front IR threshold to trigger avoidance (mm)
-    constexpr float OBSTACLE_SONAR_CM = 11.0f;  // sonar threshold to trigger avoidance (cm)
+    constexpr float OBSTACLE_SONAR_CM = 12.0f;  // sonar threshold to trigger avoidance (cm)
     constexpr float OBSTACLE_CLEAR_MM = 165.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 30.0f; // sonar must rise above this to count as clear
     constexpr float SIDE_CLEAR_MIN_MM = 55.0f; // side gap preferred before strafing toward that side

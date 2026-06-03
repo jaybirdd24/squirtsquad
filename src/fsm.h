@@ -35,6 +35,7 @@ private:
         SCANNING,        // rotate 360 deg and record long-range light readings
         ANALYZING,       // choose the target heading from the scan
         COARSE_ALIGN,    // rotate toward the target heading
+        SENSOR_ALIGN,    // rotate using long-range PT values until centred on light
         APPROACH_LIGHT,  // fuzzy fire homing + obstacle avoidance
         FINE_ALIGN,      // close-range light alignment before stopping
         ALIGNED,         // target reached/aligned
@@ -108,6 +109,7 @@ private:
     void scanForLight();
     void analyzeLightScan();
     void coarseAlignToLight();
+    void sensorAlignToLight();
     void approachLight();
     void fineAlignToLight();
     void aligned();
