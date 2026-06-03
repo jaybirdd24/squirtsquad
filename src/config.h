@@ -12,7 +12,7 @@ namespace Config {
 
     constexpr uint8_t PIN_FAN = 5;
     constexpr bool    FAN_ACTIVE_HIGH = true;
-    constexpr uint8_t FAN_FULL_DUTY = 2;
+    constexpr uint8_t FAN_FULL_DUTY = 200;
 
     // Set true only for bench testing when the robot is already facing the light.
     constexpr bool LIGHT_DIRECT_APPROACH_TEST_MODE = false;
