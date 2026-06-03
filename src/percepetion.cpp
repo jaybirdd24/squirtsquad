@@ -164,7 +164,7 @@ float percepetion::irLongRearRawToMm(int raw) const
     // good but breaks at 65 cm ID: 06
     if (raw < 20) return 800.0f;
     float mm = 128820.0f * pow((float)raw, -1.161f);
-    return constrain(mm, 100.0f, 800.0f);
+    return constrain(mm, 70.0f, 800.0f);
 }
 
 // ═══════════════════════════════════════════════════════════════════

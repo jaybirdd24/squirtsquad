@@ -650,8 +650,19 @@ void FSM::approachLight()
         vx = Config::FLC_MIN_HOMING_VX;
     }
 
-    bool leftTooClose  = validDistance(distLeft)  && distLeft  < Config::SIDE_STRAFE_TRIGGER_MM;
-    bool rightTooClose = validDistance(distRight) && distRight < Config::SIDE_STRAFE_TRIGGER_MM;
+    if (closeToLight && vx > Config::LIGHT_NEAR_MAX_VX) {
+        vx = Config::LIGHT_NEAR_MAX_VX;
+    }
+
+    const float sideGuardTriggerMm = closeToLight
+                                   ? Config::LIGHT_SIDE_STRAFE_TRIGGER_MM
+                                   : Config::SIDE_STRAFE_TRIGGER_MM;
+    const int sideGuardSpeed = closeToLight
+                             ? Config::LIGHT_SIDE_STRAFE_SPEED
+                             : Config::SIDE_STRAFE_SPEED;
+
+    bool leftTooClose  = validDistance(distLeft)  && distLeft  < sideGuardTriggerMm;
+    bool rightTooClose = validDistance(distRight) && distRight < sideGuardTriggerMm;
 
     // Blind-spot latch: the diagonal front sensors see an obstacle just before it enters
     // the gap between them and the side sensors. Each time a sensor sees something within
@@ -663,24 +674,32 @@ void FSM::approachLight()
             blindSpotLeftUntilMs  = now2 + Config::BLIND_SPOT_LATCH_MS;
         if (validDistance(distFrontB) && distFrontB < Config::BLIND_SPOT_WARN_MM)
             blindSpotRightUntilMs = now2 + Config::BLIND_SPOT_LATCH_MS;
+
+        if (now2 < blindSpotLeftUntilMs)  leftTooClose  = true;
+        if (now2 < blindSpotRightUntilMs) rightTooClose = true;
+    } else {
+        blindSpotLeftUntilMs = 0;
+        blindSpotRightUntilMs = 0;
     }
-    if (now2 < blindSpotLeftUntilMs)  leftTooClose  = true;
-    if (now2 < blindSpotRightUntilMs) rightTooClose = true;
 
     if (leftTooClose || rightTooClose) {
+        if (closeToLight && vx > Config::LIGHT_SIDE_GUARD_MAX_VX) {
+            vx = Config::LIGHT_SIDE_GUARD_MAX_VX;
+        }
+
         if (leftTooClose && rightTooClose) {
             // Both sides triggered — if avoidance has a direction, use it rather than
             // zeroing vy and stalling. selectedAvoidDirection reflects which side has
             // more room so it's the best escape vector available.
             vy = (selectedAvoidDirection != 0)
-                     ? selectedAvoidDirection * Config::SIDE_STRAFE_SPEED
+                     ? selectedAvoidDirection * sideGuardSpeed
                      : 0;
             guardCode = 'C';
         } else if (leftTooClose) {
-            vy = -Config::SIDE_STRAFE_SPEED;
+            vy = -sideGuardSpeed;
             guardCode = 'L';
         } else {
-            vy = Config::SIDE_STRAFE_SPEED;
+            vy = sideGuardSpeed;
             guardCode = 'R';
         }
         // wz left as fuzzy output so robot keeps facing the light while strafing

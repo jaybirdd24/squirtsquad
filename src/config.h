@@ -23,7 +23,7 @@ namespace Config {
     constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
     constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
     constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
-    constexpr float         LIGHT_STOP_VOLTAGE_V         = 1.0f;
+    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.85f;
     constexpr float         LIGHT_AVOID_DISABLE_V        = 3.0f;
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
@@ -48,11 +48,15 @@ namespace Config {
     constexpr int   FLC_TURN_FAST           = 200;
     constexpr int   FLC_TURN_MEDIUM         = 110;
     constexpr int   FLC_TURN_SLOW           = 50;
-    constexpr int   FLC_STRAFE_SLOW         = 80;
-    constexpr int   FLC_STRAFE_MEDIUM       = 130;
+    constexpr int   FLC_STRAFE_SLOW         = 70;
+    constexpr int   FLC_STRAFE_MEDIUM       = 110;
     constexpr int   FLC_STRAFE_FAST         = 200;
     constexpr int   FLC_MIN_ESCAPE_STRAFE   = 180;
     constexpr int   FLC_MIN_HOMING_VX       = 140;
+    constexpr int   LIGHT_NEAR_MAX_VX       = 90;    // cap final approach speed once close PTs see the fire
+    constexpr int   LIGHT_SIDE_GUARD_MAX_VX = 50;    // slow forward motion while close-light side guard is active
+    constexpr float LIGHT_SIDE_STRAFE_TRIGGER_MM = 110.0f; // close-light side guard keeps a modest obstacle margin
+    constexpr int   LIGHT_SIDE_STRAFE_SPEED      = FLC_STRAFE_SLOW;
     constexpr float SIDE_STRAFE_TRIGGER_MM = 150.0f; // strafe away from side obstacle below this distance
     constexpr int   SIDE_STRAFE_SPEED      = FLC_STRAFE_FAST;
 
@@ -70,7 +74,7 @@ namespace Config {
     // ── Speeds (0–1000) ──────────────────────────────────────────────────
     constexpr int SPEED_DRIVE  = 200; // forward speed during the isolation test
     constexpr int SPEED_SLOW   = 100; // forward speed while clearing the obstacle
-    constexpr int SPEED_STRAFE = 180; // lateral speed during obstacle avoidance
+    constexpr int SPEED_STRAFE = 150; // lateral speed during obstacle avoidance
 
     // Battery compensation is feed-forward only: it helps voltage sag, but
     // wheel/position feedback is still needed for slip and floor variation.
