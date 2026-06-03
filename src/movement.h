@@ -10,6 +10,7 @@ class movement
         Servo left_rear_motor;
         Servo right_rear_motor;
         Servo right_front_motor;
+        Servo test_servo;
 
         percepetion *perception;
 
@@ -54,6 +55,9 @@ class movement
 
         void enable();           // attach servos to pins
         void disable();          // detach servos
+
+        void servoSweepTest();      // sweep test servo on pin 7 side to side
+        void setServoAngle(int angle); // set test servo to a specific angle (0-180)
 
         // Integrates gyroZ into heading, returns wz PID correction value
         float headingCorrection();

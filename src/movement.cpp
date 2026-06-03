@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 // Pin assignments matching base code shield pinout
+static const byte PIN_TEST_SERVO   = 7;
 static const byte PIN_LEFT_FRONT  = 46;
 static const byte PIN_LEFT_REAR   = 47;
 static const byte PIN_RIGHT_REAR  = 50;
@@ -62,6 +63,7 @@ movement::~movement()
 
 void movement::enable()
 {
+    test_servo.attach(PIN_TEST_SERVO);
     left_front_motor.attach(PIN_LEFT_FRONT);
     left_rear_motor.attach(PIN_LEFT_REAR);
     right_rear_motor.attach(PIN_RIGHT_REAR);
@@ -253,6 +255,23 @@ void movement::resetWallFollow()
     prev_error_vy = 0.0f;
     filtered_derivative_vy = 0.0f;
     last_wall_us = micros();
+}
+
+void movement::servoSweepTest()
+{
+    for (int pos = 68; pos <= 112; pos++) {
+        test_servo.write(pos);
+        delay(10);
+    }
+    for (int pos = 112; pos >= 68; pos--) {
+        test_servo.write(pos);
+        delay(10);
+    }
+}
+
+void movement::setServoAngle(int angle)
+{
+    test_servo.write(constrain(angle, 0, 180));
 }
 
 void movement::Stop(bool immediate)
