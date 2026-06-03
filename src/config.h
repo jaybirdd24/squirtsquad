@@ -57,7 +57,7 @@ namespace Config {
     constexpr int   SIDE_STRAFE_SPEED      = FLC_STRAFE_FAST;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 130.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_AVOID_MM = 150.0f; // either front IR threshold to trigger avoidance (mm)
     constexpr float OBSTACLE_SONAR_CM = 11.0f;  // sonar threshold to trigger avoidance (cm)
     constexpr float OBSTACLE_CLEAR_MM = 165.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 30.0f; // sonar must rise above this to count as clear
