@@ -145,9 +145,6 @@ FSM::FSM()
       sideGuardHoldUntilMs(0),
       blindSpotLeftUntilMs(0),
       blindSpotRightUntilMs(0),
-      reverseEscapeUntilMs(0),
-      recentObstacleHits(0),
-      lastObstacleHitMs(0),
       lightsFound(0),
       alignedAtMs(0),
       lastExtinguishLogMs(0),
@@ -191,7 +188,6 @@ void FSM::fsmUpdate() {
         case State::APPROACH_LIGHT: approachLight();       break;
         case State::FINE_ALIGN:     fineAlignToLight();    break;
         case State::ALIGNED:        aligned();             break;
-        case State::REVERSE_ESCAPE: reverseEscape();       break;
     }
 
     sendTelemetry();
@@ -251,9 +247,6 @@ void FSM::resetLightScan()
     sideGuardHoldUntilMs = 0;
     blindSpotLeftUntilMs = 0;
     blindSpotRightUntilMs = 0;
-    reverseEscapeUntilMs = 0;
-    recentObstacleHits = 0;
-    lastObstacleHitMs = 0;
     alignedAtMs = 0;
     lastExtinguishLogMs = 0;
     extinguishBaselineRightV = 5.0f;
@@ -676,9 +669,10 @@ void FSM::approachLight()
 
     char guardCode = '0';
     if (blockedWithoutEscape) {
-        recordObstacleHit();
-        enterReverseEscape();
-        return;
+        vx = 0;
+        vy = 0;
+        wz = 0;
+        guardCode = 'B';
     } else if (avoidingObstacle) {
         if (abs(vy) < Config::FLC_MIN_ESCAPE_STRAFE) {
             vy = selectedAvoidDirection * Config::FLC_MIN_ESCAPE_STRAFE;
@@ -927,63 +921,6 @@ int FSM::chooseAvoidDirection() const {
     if (leftSafe)  return 1;
     if (rightSafe) return -1;
     return 0;  // truly no information on either side
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Reverse escape
-// ─────────────────────────────────────────────────────────────────────────────
-
-void FSM::recordObstacleHit()
-{
-    unsigned long now = millis();
-    // lastObstacleHitMs == 0 means no previous hit has been recorded yet
-    if (lastObstacleHitMs != 0 && now - lastObstacleHitMs < Config::OSCILLATION_WINDOW_MS) {
-        recentObstacleHits++;
-    } else {
-        recentObstacleHits = 1;
-    }
-    lastObstacleHitMs = now;
-}
-
-void FSM::enterReverseEscape()
-{
-    bool oscillating = recentObstacleHits >= Config::OSCILLATION_TRIGGER_COUNT;
-
-    unsigned long duration = oscillating ? Config::REVERSE_ESCAPE_LONG_MS
-                                         : Config::REVERSE_ESCAPE_MS;
-    reverseEscapeUntilMs = millis() + duration;
-
-    // Oscillating: we've hit an obstacle from the same direction repeatedly.
-    // Flip the latched avoid direction so we try the other side on the next approach.
-    if (oscillating && avoidDirection != 0) {
-        avoidDirection = -avoidDirection;
-    }
-
-    motors.Stop(true);
-    motors.latchHeading();
-    state = State::REVERSE_ESCAPE;
-
-    Serial.print(F("# REVERSE_ESCAPE hits="));
-    Serial.print(recentObstacleHits);
-    Serial.print(F(" dur="));
-    Serial.print(duration);
-    Serial.println(oscillating ? F("ms [oscillating, dir flipped]") : F("ms"));
-}
-
-void FSM::reverseEscape()
-{
-    // Drive straight backward, heading correction keeps us from spinning.
-    // Speed is intentionally conservative — we have no rear sensor.
-    int wz = (int)motors.headingCorrection();
-    motors.drive(-Config::REVERSE_ESCAPE_SPEED, 0, wz);
-
-    if (millis() >= reverseEscapeUntilMs) {
-        motors.Stop(true);
-        motors.latchHeading();
-        avoidDirection = 0;  // let selectAvoidDirection pick fresh on the next approach
-        state = State::APPROACH_LIGHT;
-        Serial.println(F("# Reverse escape done, resuming approach"));
-    }
 }
 
 void FSM::sendTelemetry() {

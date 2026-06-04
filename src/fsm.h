@@ -38,8 +38,7 @@ private:
         SENSOR_ALIGN,    // rotate using long-range PT values until centred on light
         APPROACH_LIGHT,  // fuzzy fire homing + obstacle avoidance
         FINE_ALIGN,      // close-range light alignment before stopping
-        ALIGNED,         // target reached/aligned
-        REVERSE_ESCAPE   // reversing away from a fully-blocked zone
+        ALIGNED          // target reached/aligned
     };
     State state;
 
@@ -79,13 +78,6 @@ private:
     // ── Blind-spot latches ────────────────────────────────────────────
     unsigned long blindSpotLeftUntilMs;   // keep left side guard active until this time
     unsigned long blindSpotRightUntilMs;  // keep right side guard active until this time
-
-    // ── Reverse escape ────────────────────────────────────────────────
-    unsigned long reverseEscapeUntilMs;  // keep reversing until this timestamp
-
-    // ── Obstacle memory / anti-oscillation ───────────────────────────
-    int           recentObstacleHits;    // hits recorded inside the rolling window
-    unsigned long lastObstacleHitMs;     // timestamp of most recent obstacle hit (0 = none)
 
     // ── Multi-light tracking ──────────────────────────────────────────
     int           lightsFound;           // number of lights reached so far
@@ -130,9 +122,4 @@ private:
     bool sideClearForDirection(int direction) const;
     int  chooseAvoidDirection() const;
     void sendTelemetry();
-
-    // ── Reverse escape helpers ────────────────────────────────────────
-    void reverseEscape();       // state handler: timed backward drive
-    void recordObstacleHit();   // update oscillation counter + log
-    void enterReverseEscape();  // stop motors, set timer, transition state
 };
