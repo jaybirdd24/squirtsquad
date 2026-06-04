@@ -23,14 +23,11 @@ namespace Config {
     constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
     constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
     constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
-    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.85f;
+    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.2f;
     constexpr float         LIGHT_AVOID_DISABLE_V        = 3.0f;
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
     constexpr float         LIGHT_LONG_SUPPRESS_V        = 3.0f;  // long-range sensor threshold below which the obstacle ahead is assumed to be the pillar — disables forward obstacle avoidance
-    constexpr float         LIGHT_SENSOR_ALIGN_V          = 0.4f;
-    constexpr unsigned long LIGHT_SENSOR_ALIGN_TIMEOUT_MS = 5000;
-    constexpr int           LIGHT_SENSOR_ALIGN_SPEED      = 80;
     constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V  = 0.6f;
     constexpr int           LIGHT_FINE_ALIGN_SPEED        = 150;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
