@@ -97,14 +97,6 @@ namespace Config {
     constexpr unsigned int OBSTACLE_CLEAR_TICKS   = 6; // consecutive clear ticks before driving forward again
     constexpr unsigned long AVOID_DIRECTION_STICKY_MS = 1000; // reuse direction if obstacle reappears soon
 
-    // Blind-spot coverage
-    // The diagonal front sensors see an obstacle just before it enters the blind spot gap.
-    // BLIND_SPOT_WARN_MM: detection distance that refreshes the latch.
-    // BLIND_SPOT_LATCH_MS: how long to keep the side strafe active after the sensor loses
-    //                      sight of it (carries avoidance through the blind spot transition).
-    constexpr float          BLIND_SPOT_WARN_MM  = 150.0f;
-    constexpr unsigned long  BLIND_SPOT_LATCH_MS = 600;
-
     // ── Pins ─────────────────────────────────────────────────────────────
     constexpr uint8_t PIN_MOTOR_LF = 46; // left-front motor PWM servo pin
     constexpr uint8_t PIN_MOTOR_LR = 47; // left-rear motor PWM servo pin

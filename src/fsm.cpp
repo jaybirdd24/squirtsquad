@@ -143,8 +143,6 @@ FSM::FSM()
       avoidSuppressUntilMs(0),
       sideGuardBlockedSide(0),
       sideGuardHoldUntilMs(0),
-      blindSpotLeftUntilMs(0),
-      blindSpotRightUntilMs(0),
       lightsFound(0),
       alignedAtMs(0),
       lastExtinguishLogMs(0),
@@ -245,8 +243,6 @@ void FSM::resetLightScan()
     avoidSuppressUntilMs = 0;
     sideGuardBlockedSide = 0;
     sideGuardHoldUntilMs = 0;
-    blindSpotLeftUntilMs = 0;
-    blindSpotRightUntilMs = 0;
     alignedAtMs = 0;
     lastExtinguishLogMs = 0;
     extinguishBaselineRightV = 5.0f;
@@ -695,24 +691,6 @@ void FSM::approachLight()
 
     bool leftTooClose  = validDistance(distLeft)  && distLeft  < sideGuardTriggerMm;
     bool rightTooClose = validDistance(distRight) && distRight < sideGuardTriggerMm;
-
-    // Blind-spot latch: the diagonal front sensors see an obstacle just before it enters
-    // the gap between them and the side sensors. Each time a sensor sees something within
-    // BLIND_SPOT_WARN_MM, the latch is refreshed. The latch stays active for
-    // BLIND_SPOT_LATCH_MS after the sensor last saw it, bridging the transition into the
-    // blind spot. Suppressed when close to the light to avoid reacting to the fire pedestal.
-    if (!closeToLight) {
-        if (validDistance(distFrontA) && distFrontA < Config::BLIND_SPOT_WARN_MM)
-            blindSpotLeftUntilMs  = now2 + Config::BLIND_SPOT_LATCH_MS;
-        if (validDistance(distFrontB) && distFrontB < Config::BLIND_SPOT_WARN_MM)
-            blindSpotRightUntilMs = now2 + Config::BLIND_SPOT_LATCH_MS;
-
-        if (now2 < blindSpotLeftUntilMs)  leftTooClose  = true;
-        if (now2 < blindSpotRightUntilMs) rightTooClose = true;
-    } else {
-        blindSpotLeftUntilMs = 0;
-        blindSpotRightUntilMs = 0;
-    }
 
     if (leftTooClose || rightTooClose) {
         if (closeToLight && vx > Config::LIGHT_SIDE_GUARD_MAX_VX) {
