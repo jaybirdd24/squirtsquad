@@ -23,7 +23,7 @@ namespace Config {
     constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
     constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
     constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
-    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.8f;
+    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.9f;
     constexpr float         LIGHT_AVOID_DISABLE_V        = 3.0f;
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
@@ -37,6 +37,9 @@ namespace Config {
     constexpr int           LIGHT_POST_ALIGN_FORWARD_SPEED = 100;
     constexpr float         LIGHT_POST_ALIGN_STOP_CM       = 6.0f;
     constexpr unsigned long LIGHT_POST_ALIGN_TIMEOUT_MS    = 2500; // safety stop if sonar cannot confirm the fire distance
+    constexpr int           LIGHT_POST_EXTINGUISH_RETREAT_SPEED = 110;
+    constexpr float         LIGHT_POST_EXTINGUISH_RETREAT_CM    = 5.0f;
+    constexpr unsigned long LIGHT_POST_EXTINGUISH_RETREAT_TIMEOUT_MS = 1200;
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
@@ -64,7 +67,7 @@ namespace Config {
     constexpr int   SIDE_STRAFE_SPEED      = FLC_STRAFE_FAST;
 
     // ── Distances ────────────────────────────────────────────────────────
-    constexpr float OBSTACLE_AVOID_MM = 140.0f; // either front IR threshold to trigger avoidance (mm)
+    constexpr float OBSTACLE_AVOID_MM = 120.0f; // either front IR threshold to trigger avoidance (mm)
     constexpr float OBSTACLE_SONAR_CM = 12.0f;  // sonar threshold to trigger avoidance (cm)
     constexpr float OBSTACLE_CLEAR_MM = 165.0f; // front-left/front-right IR must rise above this to count as clear
     constexpr float OBSTACLE_SONAR_CLEAR_CM = 30.0f; // sonar must rise above this to count as clear
@@ -73,6 +76,10 @@ namespace Config {
     constexpr float SIDE_OPEN_COMPARE_CAP_MM = 300.0f; // cap side comparison to the shorter side sensor range
     constexpr float SIDE_OPEN_SWITCH_MARGIN_MM = 50.0f; // clearance advantage needed before switching escape side
     constexpr float SIDE_ESCAPE_MIN_MM = 50.0f; // absolute minimum side gap for an escape strafe
+    constexpr float AVOID_EDGE_GUARD_MAX_MM = 260.0f; // leading front IR must be this close before trend-backoff can trigger
+    constexpr float AVOID_EDGE_GUARD_DROP_MM = 18.0f; // same-side front IR decrease that means the strafe is closing on an end obstacle
+    constexpr unsigned long AVOID_EDGE_RETREAT_MS = 300; // reverse pulse duration when the leading front IR is closing
+    constexpr int AVOID_EDGE_RETREAT_SPEED = 95; // backward speed during leading-edge guard
 
     // ── Speeds (0–1000) ──────────────────────────────────────────────────
     constexpr int SPEED_DRIVE  = 200; // forward speed during the isolation test

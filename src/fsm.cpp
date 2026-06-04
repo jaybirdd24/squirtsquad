@@ -143,11 +143,16 @@ FSM::FSM()
       avoidSuppressUntilMs(0),
       sideGuardBlockedSide(0),
       sideGuardHoldUntilMs(0),
+      avoidLeadFrontDirection(0),
+      avoidLeadFrontReferenceMm(0.0f),
+      avoidEdgeRetreatUntilMs(0),
       lightsFound(0),
       alignedAtMs(0),
       lastExtinguishLogMs(0),
       alignedNudgeStartMs(0),
       alignedNudgePending(false),
+      postExtinguishRetreatStartMs(0),
+      postExtinguishRetreatStartCm(0.0f),
       extinguishBaselineRightV(5.0f),
       extinguishBaselineLeftV(5.0f),
       lastGyroBiasMs(0),
@@ -187,6 +192,9 @@ void FSM::fsmUpdate() {
         case State::APPROACH_LIGHT: approachLight();       break;
         case State::FINE_ALIGN:     fineAlignToLight();    break;
         case State::ALIGNED:        aligned();             break;
+        case State::POST_EXTINGUISH_RETREAT:
+            postExtinguishRetreat();
+            break;
     }
 
     sendTelemetry();
@@ -244,10 +252,15 @@ void FSM::resetLightScan()
     avoidSuppressUntilMs = 0;
     sideGuardBlockedSide = 0;
     sideGuardHoldUntilMs = 0;
+    avoidLeadFrontDirection = 0;
+    avoidLeadFrontReferenceMm = 0.0f;
+    avoidEdgeRetreatUntilMs = 0;
     alignedAtMs = 0;
     lastExtinguishLogMs = 0;
     alignedNudgeStartMs = 0;
     alignedNudgePending = false;
+    postExtinguishRetreatStartMs = 0;
+    postExtinguishRetreatStartCm = 0.0f;
     extinguishBaselineRightV = 5.0f;
     extinguishBaselineLeftV = 5.0f;
     lastVx = lastVy = lastWz = 0;
@@ -690,6 +703,18 @@ void FSM::approachLight()
         // wz left as fuzzy output so robot keeps facing the light while strafing
     }
 
+    int activeStrafeDirection = 0;
+    if (vy > 0) {
+        activeStrafeDirection = 1;
+    } else if (vy < 0) {
+        activeStrafeDirection = -1;
+    }
+
+    if (!closeToLight && updateAvoidEdgeRetreat(activeStrafeDirection, now2)) {
+        vx = -Config::AVOID_EDGE_RETREAT_SPEED;
+        guardCode = 'E';
+    }
+
     motors.drive(vx, vy, wz);
 
     lastVx = vx;
@@ -861,12 +886,53 @@ void FSM::aligned()
             return;
         }
 
-        resetLightScan();
-        motors.resetHeading();
+        postExtinguishRetreatStartMs = 0;
+        postExtinguishRetreatStartCm = 0.0f;
         motors.latchHeading();
-        Serial.println(F("# Scanning for next light..."));
-        state = State::SCANNING;
+        Serial.print(F("# Backing away "));
+        Serial.print(Config::LIGHT_POST_EXTINGUISH_RETREAT_CM, 1);
+        Serial.println(F(" cm before next scan..."));
+        state = State::POST_EXTINGUISH_RETREAT;
     }
+}
+
+void FSM::postExtinguishRetreat()
+{
+    unsigned long now = millis();
+
+    if (postExtinguishRetreatStartMs == 0) {
+        postExtinguishRetreatStartMs = now;
+        postExtinguishRetreatStartCm = validDistance(distSonar) ? distSonar : 0.0f;
+    }
+
+    bool sonarTracking = validDistance(postExtinguishRetreatStartCm) &&
+                         validDistance(distSonar);
+    bool retreatedFarEnough =
+        sonarTracking &&
+        distSonar >= postExtinguishRetreatStartCm +
+                     Config::LIGHT_POST_EXTINGUISH_RETREAT_CM;
+    bool timedOut =
+        now - postExtinguishRetreatStartMs >=
+        Config::LIGHT_POST_EXTINGUISH_RETREAT_TIMEOUT_MS;
+
+    if (!retreatedFarEnough && !timedOut) {
+        motors.MoveBackward(Config::LIGHT_POST_EXTINGUISH_RETREAT_SPEED);
+        return;
+    }
+
+    motors.Stop(true);
+
+    if (timedOut && !retreatedFarEnough) {
+        Serial.println(F("# Post-extinguish retreat timeout; scanning anyway."));
+    } else {
+        Serial.println(F("# Post-extinguish retreat complete."));
+    }
+
+    resetLightScan();
+    motors.resetHeading();
+    motors.latchHeading();
+    Serial.println(F("# Scanning for next light..."));
+    state = State::SCANNING;
 }
 
 bool FSM::forwardObstacleDetected() const {
@@ -891,6 +957,53 @@ bool FSM::sideClearForDirection(int direction) const {
     return false;
 }
 
+float FSM::frontDistanceForDirection(int direction) const {
+    if (direction > 0) {
+        return Config::FRONT_A_IS_LEFT ? distFrontA : distFrontB;
+    }
+    if (direction < 0) {
+        return Config::FRONT_A_IS_LEFT ? distFrontB : distFrontA;
+    }
+    return 0.0f;
+}
+
+bool FSM::updateAvoidEdgeRetreat(int direction, unsigned long now) {
+    if (direction == 0) {
+        avoidLeadFrontDirection = 0;
+        avoidLeadFrontReferenceMm = 0.0f;
+        avoidEdgeRetreatUntilMs = 0;
+        return false;
+    }
+
+    float leadFrontMm = frontDistanceForDirection(direction);
+    if (!validDistance(leadFrontMm)) {
+        avoidLeadFrontDirection = direction;
+        avoidLeadFrontReferenceMm = 0.0f;
+        return now < avoidEdgeRetreatUntilMs;
+    }
+
+    if (direction != avoidLeadFrontDirection || avoidLeadFrontReferenceMm <= 0.0f) {
+        avoidLeadFrontDirection = direction;
+        avoidLeadFrontReferenceMm = leadFrontMm;
+        return now < avoidEdgeRetreatUntilMs;
+    }
+
+    if (leadFrontMm > avoidLeadFrontReferenceMm) {
+        avoidLeadFrontReferenceMm = leadFrontMm;
+    }
+
+    bool closingOnEndObstacle =
+        leadFrontMm <= Config::AVOID_EDGE_GUARD_MAX_MM &&
+        leadFrontMm + Config::AVOID_EDGE_GUARD_DROP_MM <= avoidLeadFrontReferenceMm;
+
+    if (closingOnEndObstacle) {
+        avoidEdgeRetreatUntilMs = now + Config::AVOID_EDGE_RETREAT_MS;
+        avoidLeadFrontReferenceMm = leadFrontMm;
+    }
+
+    return now < avoidEdgeRetreatUntilMs;
+}
+
 int FSM::chooseAvoidDirection() const {
     bool frontABlocked = validDistance(distFrontA) &&
                          distFrontA <= Config::OBSTACLE_AVOID_MM;
@@ -899,8 +1012,6 @@ int FSM::chooseAvoidDirection() const {
 
     bool leftSafe = sideClearForDirection(1);
     bool rightSafe = sideClearForDirection(-1);
-    float leftClearance = cappedSideClearance(distLeft);
-    float rightClearance = cappedSideClearance(distRight);
 
     if (frontABlocked != frontBBlocked) {
         bool blockedSideIsLeft = frontABlocked == Config::FRONT_A_IS_LEFT;

@@ -37,7 +37,8 @@ private:
         COARSE_ALIGN,    // rotate toward the target heading
         APPROACH_LIGHT,  // fuzzy fire homing + obstacle avoidance
         FINE_ALIGN,      // close-range light alignment before stopping
-        ALIGNED          // target reached/aligned
+        ALIGNED,         // target reached/aligned
+        POST_EXTINGUISH_RETREAT // back away from the first fire before scanning again
     };
     State state;
 
@@ -73,6 +74,9 @@ private:
     unsigned long avoidSuppressUntilMs;  // obstacle avoidance suppressed until this timestamp
     int           sideGuardBlockedSide;  // +1 = left latched, -1 = right latched
     unsigned long sideGuardHoldUntilMs;  // minimum hold time for side guard latch
+    int           avoidLeadFrontDirection; // strafe direction used for leading-front trend tracking
+    float         avoidLeadFrontReferenceMm; // farthest recent same-side front IR reading while strafing
+    unsigned long avoidEdgeRetreatUntilMs; // reverse pulse hold time after leading-front IR closes
 
     // ── Multi-light tracking ──────────────────────────────────────────
     int           lightsFound;           // number of lights reached so far
@@ -80,6 +84,8 @@ private:
     unsigned long lastExtinguishLogMs;
     unsigned long alignedNudgeStartMs;
     bool          alignedNudgePending;
+    unsigned long postExtinguishRetreatStartMs;
+    float         postExtinguishRetreatStartCm;
     float         extinguishBaselineRightV;
     float         extinguishBaselineLeftV;
 
@@ -101,6 +107,7 @@ private:
     void approachLight();
     void fineAlignToLight();
     void aligned();
+    void postExtinguishRetreat();
 
     // ── Light helpers ─────────────────────────────────────────────────
     void  resetLightScan();
@@ -116,6 +123,8 @@ private:
     // ── Avoidance helpers ─────────────────────────────────────────────
     bool forwardObstacleDetected() const;
     bool sideClearForDirection(int direction) const;
+    float frontDistanceForDirection(int direction) const;
+    bool updateAvoidEdgeRetreat(int direction, unsigned long now);
     int  chooseAvoidDirection() const;
     void sendTelemetry();
 };
