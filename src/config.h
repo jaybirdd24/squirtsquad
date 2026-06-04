@@ -23,7 +23,7 @@ namespace Config {
     constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
     constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
     constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
-    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.16f;
+    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.8f;
     constexpr float         LIGHT_AVOID_DISABLE_V        = 3.0f;
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
@@ -34,6 +34,8 @@ namespace Config {
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
     constexpr unsigned long LIGHT_EXTINGUISH_LOG_MS       = 250;
     constexpr float         LIGHT_EXTINGUISHED_LONG_V     = 4.0f; // long-range sensor threshold above which fire is considered extinguished
+    constexpr int           LIGHT_POST_ALIGN_FORWARD_SPEED = 100;
+    constexpr unsigned long LIGHT_POST_ALIGN_FORWARD_MS    = 500; // open-loop nudge; tune on the robot for about 5 cm
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.

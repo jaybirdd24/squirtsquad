@@ -78,6 +78,8 @@ private:
     int           lightsFound;           // number of lights reached so far
     unsigned long alignedAtMs;           // timestamp when first ALIGNED was entered
     unsigned long lastExtinguishLogMs;
+    unsigned long alignedNudgeStartMs;
+    bool          alignedNudgePending;
     float         extinguishBaselineRightV;
     float         extinguishBaselineLeftV;
 

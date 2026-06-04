@@ -146,6 +146,8 @@ FSM::FSM()
       lightsFound(0),
       alignedAtMs(0),
       lastExtinguishLogMs(0),
+      alignedNudgeStartMs(0),
+      alignedNudgePending(false),
       extinguishBaselineRightV(5.0f),
       extinguishBaselineLeftV(5.0f),
       lastGyroBiasMs(0),
@@ -244,6 +246,8 @@ void FSM::resetLightScan()
     sideGuardHoldUntilMs = 0;
     alignedAtMs = 0;
     lastExtinguishLogMs = 0;
+    alignedNudgeStartMs = 0;
+    alignedNudgePending = false;
     extinguishBaselineRightV = 5.0f;
     extinguishBaselineLeftV = 5.0f;
     lastVx = lastVy = lastWz = 0;
@@ -740,6 +744,8 @@ void FSM::fineAlignToLight()
     if (balanced || timedOut) {
         motors.Stop(true);
         Serial.println(timedOut ? F("# Fine align timeout; declaring ALIGNED") : F("# ALIGNED"));
+        alignedNudgeStartMs = 0;
+        alignedNudgePending = true;
         state = State::ALIGNED;
         return;
     }
@@ -761,9 +767,10 @@ void FSM::fineAlignToLight()
 
 void FSM::aligned()
 {
-    motors.Stop(true);
+    unsigned long now = millis();
 
     if (lightsFound >= Config::FIRES_TO_EXTINGUISH) {
+        motors.Stop(true);
         setFanDuty(0);
         return;
     }
@@ -771,16 +778,37 @@ void FSM::aligned()
     setFanDuty(Config::FAN_FULL_DUTY);
 
     if (alignedAtMs == 0) {
-        alignedAtMs = millis();
+        alignedAtMs = now;
         lastExtinguishLogMs = 0;
+        if (alignedNudgePending) {
+            motors.latchHeading();
+        }
         Serial.print(F("# Fire "));
         Serial.print(lightsFound + 1);
-        Serial.println(F(" aligned. Fan on. Waiting for A5+A6 > 4V..."));
+        Serial.println(F(" aligned. Fan on."));
+    }
+
+    if (alignedNudgePending) {
+        if (alignedNudgeStartMs == 0) {
+            alignedNudgeStartMs = now;
+            Serial.println(F("# Nudging forward before extinguish check..."));
+        }
+
+        if (now - alignedNudgeStartMs < Config::LIGHT_POST_ALIGN_FORWARD_MS) {
+            motors.MoveForward(Config::LIGHT_POST_ALIGN_FORWARD_SPEED);
+            return;
+        }
+
+        motors.Stop(true);
+        alignedNudgePending = false;
+        lastExtinguishLogMs = 0;
+        Serial.println(F("# Forward nudge complete. Waiting for A5+A6 > 4V..."));
+        return;
     }
 
     float longRightV = adcToVolts(lightLongRightRaw);
     float longLeftV  = adcToVolts(lightLongLeftRaw);
-    unsigned long now = millis();
+    motors.Stop(true);
 
     if (now - lastExtinguishLogMs >= Config::LIGHT_EXTINGUISH_LOG_MS) {
         lastExtinguishLogMs = now;
