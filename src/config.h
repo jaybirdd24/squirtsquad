@@ -23,7 +23,7 @@ namespace Config {
     constexpr unsigned long LIGHT_LOG_INTERVAL_MS        = 50;
     constexpr float         LIGHT_DETECT_THRESHOLD_V     = 4.5f;
     constexpr float         LIGHT_HEADING_TOLERANCE_DEG  = 3.0f;
-    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.2f;
+    constexpr float         LIGHT_STOP_VOLTAGE_V         = 0.16f;
     constexpr float         LIGHT_AVOID_DISABLE_V        = 3.0f;
     constexpr float         LIGHT_CLOSE_SUPPRESS_V       = 1.5f;
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;

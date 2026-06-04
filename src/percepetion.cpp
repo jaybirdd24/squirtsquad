@@ -102,25 +102,7 @@ void percepetion::readUltrasonic()
     // No echo — keep previous filtered value
     if (rawCm <= 0.0f) return;
 
-    // Spike rejection: if reading jumps too far from last valid, reject it.
-    // After 3 consecutive rejects, accept anyway (the robot actually moved).
-    if (usLastValidCm > 0.0f &&
-        fabsf(rawCm - usLastValidCm) > US_MAX_JUMP_CM &&
-        usRejectCount < 3)
-    {
-        usRejectCount++;
-        return;
-    }
-
-    usRejectCount = 0;
-    usLastValidCm = rawCm;
-
-    // EMA low-pass filter
-    if (usDistanceCm <= 0.0f) {
-        usDistanceCm = rawCm;  // seed on first valid reading
-    } else {
-        usDistanceCm += US_EMA_ALPHA * (rawCm - usDistanceCm);
-    }
+    usDistanceCm = rawCm;
 }
 
 // ── IR distance conversion (power-law curve fit) ──────────────────
