@@ -791,12 +791,39 @@ void FSM::aligned()
     if (alignedNudgePending) {
         if (alignedNudgeStartMs == 0) {
             alignedNudgeStartMs = now;
-            Serial.println(F("# Nudging forward before extinguish check..."));
+            lastExtinguishLogMs = 0;
+            Serial.print(F("# Fan on. Nudging forward until sonar <= "));
+            Serial.print(Config::LIGHT_POST_ALIGN_STOP_CM, 1);
+            Serial.println(F(" cm..."));
         }
 
-        if (now - alignedNudgeStartMs < Config::LIGHT_POST_ALIGN_FORWARD_MS) {
-            motors.MoveForward(Config::LIGHT_POST_ALIGN_FORWARD_SPEED);
+        bool sonarValid = validDistance(distSonar);
+        bool closeEnough = sonarValid && distSonar <= Config::LIGHT_POST_ALIGN_STOP_CM;
+        bool timedOut = (now - alignedNudgeStartMs) > Config::LIGHT_POST_ALIGN_TIMEOUT_MS;
+
+        if (now - lastExtinguishLogMs >= Config::LIGHT_EXTINGUISH_LOG_MS) {
+            lastExtinguishLogMs = now;
+            Serial.print(F("# nudge sonar_cm="));
+            Serial.print(distSonar, 1);
+            Serial.print(F(" valid="));
+            Serial.println(sonarValid ? 1 : 0);
+        }
+
+        if (!closeEnough && !timedOut) {
+            if (sonarValid) {
+                motors.MoveForward(Config::LIGHT_POST_ALIGN_FORWARD_SPEED);
+            } else {
+                motors.Stop(true);
+            }
             return;
+        }
+
+        if (timedOut && !closeEnough) {
+            Serial.println(F("# Forward nudge timeout; continuing extinguish check."));
+        }
+
+        if (closeEnough) {
+            Serial.println(F("# Forward nudge reached sonar target."));
         }
 
         motors.Stop(true);

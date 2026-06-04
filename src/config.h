@@ -29,13 +29,14 @@ namespace Config {
     constexpr unsigned long LIGHT_CLOSE_SUPPRESS_MS      = 10000;
     constexpr float         LIGHT_LONG_SUPPRESS_V        = 3.0f;  // long-range sensor threshold below which the obstacle ahead is assumed to be the pillar — disables forward obstacle avoidance
     constexpr float         LIGHT_FINE_ALIGN_TOLERANCE_V  = 0.6f;
-    constexpr int           LIGHT_FINE_ALIGN_SPEED        = 150;
+    constexpr int           LIGHT_FINE_ALIGN_SPEED        = 178;
     constexpr unsigned long LIGHT_COARSE_ALIGN_TIMEOUT_MS = 4000;
     constexpr unsigned long LIGHT_FINE_ALIGN_TIMEOUT_MS   = 5000;
     constexpr unsigned long LIGHT_EXTINGUISH_LOG_MS       = 250;
     constexpr float         LIGHT_EXTINGUISHED_LONG_V     = 4.0f; // long-range sensor threshold above which fire is considered extinguished
     constexpr int           LIGHT_POST_ALIGN_FORWARD_SPEED = 100;
-    constexpr unsigned long LIGHT_POST_ALIGN_FORWARD_MS    = 500; // open-loop nudge; tune on the robot for about 5 cm
+    constexpr float         LIGHT_POST_ALIGN_STOP_CM       = 6.0f;
+    constexpr unsigned long LIGHT_POST_ALIGN_TIMEOUT_MS    = 2500; // safety stop if sonar cannot confirm the fire distance
 
     // Fuzzy light-approach outputs. Signs match movement::drive():
     // vx+ = forward, vy+ = left strafe, wz+ = right/CW turn.
